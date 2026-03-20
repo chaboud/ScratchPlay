@@ -6,14 +6,56 @@ codec, container, and quality. Record/Preview/Thermal/MultiCam buttons.
 Audio level meter, pre-roll buffer, timecode overlay, thermal range lock.
 """
 
+import multiprocessing
 import os
-import threading
 import time
 import tkinter as tk
 from tkinter import filedialog, ttk
 
 from devices import list_avfoundation_devices, probe_camera_formats, get_unique_resolutions, get_fps_for_resolution
-from recorder import RecordingSession, CODEC_MAP, CONTAINER_EXT, DEFAULT_CRF
+from recorder import RecordingSession, CODEC_MAP
+
+
+def _run_preview_process(cam, w, h, fps, codec, container, crf, output_dir,
+                         base_name, preroll, audio_device, overlay):
+    """Run preview in a separate process so OpenCV gets its own main thread."""
+    from preview import PreviewWindow
+    pw = PreviewWindow(
+        mode="regular", device_index=cam, width=w, height=h, fps=fps,
+        codec=codec, container=container, crf=crf,
+        output_dir=output_dir, base_name=base_name,
+        pre_roll_seconds=preroll, audio_device=audio_device, overlay=overlay,
+    )
+    pw.run()
+
+
+def _run_thermal_process(mode, device_index, colormap, output_dir, base_name,
+                         range_lock, audio_device):
+    """Run thermal preview in a separate process."""
+    from preview import PreviewWindow
+    pw = PreviewWindow(
+        mode=mode, device_index=device_index, colormap=colormap,
+        output_dir=output_dir, base_name=base_name,
+        range_lock=range_lock, audio_device=audio_device,
+    )
+    pw.run()
+
+
+def _run_multicam_process(output_dir, base_name, video_devices):
+    """Run multicam preview in a separate process."""
+    from multicam import MultiCamSession, CameraConfig
+    session = MultiCamSession(output_dir=output_dir, base_name=base_name)
+    for dev_idx, name in video_devices:
+        session.add_camera(CameraConfig(
+            device_index=dev_idx, name=name.replace(" ", "_")[:20],
+        ))
+    session.open_all()
+    try:
+        session.show_preview()
+    finally:
+        if session.is_recording:
+            session.stop_all()
+        session.close_all()
 
 
 class RecorderApp:
@@ -342,25 +384,16 @@ class RecorderApp:
         self.status_var.set("Opening preview...")
         self.root.update_idletasks()
 
-        def _run():
-            from preview import PreviewWindow
-            pw = PreviewWindow(
-                mode="regular",
-                device_index=cam,
-                width=w, height=h, fps=fps,
-                codec=self.codec_var.get(),
-                container=self.container_var.get(),
-                crf=crf,
-                output_dir=self.dir_var.get(),
-                base_name=self.name_var.get(),
-                pre_roll_seconds=preroll,
-                audio_device=self._get_audio_index(),
-                overlay=self.overlay_var.get(),
-            )
-            pw.run()
-            self.root.after(0, lambda: self.status_var.set("Preview closed"))
-
-        threading.Thread(target=_run, daemon=True).start()
+        # Use multiprocessing so OpenCV gets its own main thread (required on macOS)
+        p = multiprocessing.Process(
+            target=_run_preview_process,
+            args=(cam, w, h, fps, self.codec_var.get(),
+                  self.container_var.get(), crf, self.dir_var.get(),
+                  self.name_var.get(), preroll,
+                  self._get_audio_index(), self.overlay_var.get()),
+            daemon=True,
+        )
+        p.start()
 
     # --- Thermal preview ---
 
@@ -373,21 +406,14 @@ class RecorderApp:
         self.status_var.set(f"Opening thermal preview ({mode})...")
         self.root.update_idletasks()
 
-        def _run():
-            from preview import PreviewWindow
-            pw = PreviewWindow(
-                mode=mode,
-                device_index=cam if cam is not None else 0,
-                colormap=colormap,
-                output_dir=self.dir_var.get(),
-                base_name=self.name_var.get(),
-                range_lock=range_lock,
-                audio_device=self._get_audio_index(),
-            )
-            pw.run()
-            self.root.after(0, lambda: self.status_var.set("Thermal preview closed"))
-
-        threading.Thread(target=_run, daemon=True).start()
+        p = multiprocessing.Process(
+            target=_run_thermal_process,
+            args=(mode, cam if cam is not None else 0, colormap,
+                  self.dir_var.get(), self.name_var.get(),
+                  range_lock, self._get_audio_index()),
+            daemon=True,
+        )
+        p.start()
 
     # --- Multi-camera ---
 
@@ -401,27 +427,13 @@ class RecorderApp:
 
         indices = [idx for idx, name in self._devices["video"]]
 
-        def _run():
-            from multicam import MultiCamSession, CameraConfig
-            session = MultiCamSession(
-                output_dir=self.dir_var.get(),
-                base_name=self.name_var.get(),
-            )
-            for idx, (dev_idx, name) in enumerate(self._devices["video"]):
-                session.add_camera(CameraConfig(
-                    device_index=dev_idx,
-                    name=name.replace(" ", "_")[:20],
-                ))
-            session.open_all()
-            try:
-                session.show_preview()
-            finally:
-                if session.is_recording:
-                    session.stop_all()
-                session.close_all()
-            self.root.after(0, lambda: self.status_var.set("Multi-cam closed"))
-
-        threading.Thread(target=_run, daemon=True).start()
+        video_devices = list(self._devices["video"])
+        p = multiprocessing.Process(
+            target=_run_multicam_process,
+            args=(self.dir_var.get(), self.name_var.get(), video_devices),
+            daemon=True,
+        )
+        p.start()
 
 
 def main():

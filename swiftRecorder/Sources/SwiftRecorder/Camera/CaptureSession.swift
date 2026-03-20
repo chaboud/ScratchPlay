@@ -29,15 +29,20 @@ public final class CaptureSession: NSObject, ObservableObject {
     /// Callbacks for video sample buffers (preview, recording, etc.)
     private var videoHandlers: [(CMSampleBuffer) -> Void] = []
     private var audioHandlers: [(CMSampleBuffer) -> Void] = []
+    private let handlerLock = NSLock()
 
     // MARK: - Setup
 
     public func addVideoHandler(_ handler: @escaping (CMSampleBuffer) -> Void) {
+        handlerLock.lock()
         videoHandlers.append(handler)
+        handlerLock.unlock()
     }
 
     public func addAudioHandler(_ handler: @escaping (CMSampleBuffer) -> Void) {
+        handlerLock.lock()
         audioHandlers.append(handler)
+        handlerLock.unlock()
     }
 
     /// Configure the session with a video device and optional audio device.
@@ -72,7 +77,7 @@ public final class CaptureSession: NSObject, ObservableObject {
         if targetW > 0 && targetH > 0 {
             if let (format, fpsRange) = DeviceEnumerator.bestFormat(
                 for: videoDevice, width: targetW, height: targetH,
-                fps: targetFPS > 0 ? targetFPS : fpsRange(format: nil)
+                fps: targetFPS > 0 ? targetFPS : DeviceEnumerator.maxFrameRate(for: videoDevice, width: targetW, height: targetH)
             ) {
                 try videoDevice.lockForConfiguration()
                 videoDevice.activeFormat = format
@@ -165,12 +170,17 @@ extension CaptureSession: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptur
         didOutput sampleBuffer: CMSampleBuffer,
         from connection: AVCaptureConnection
     ) {
+        handlerLock.lock()
+        let vHandlers = videoHandlers
+        let aHandlers = audioHandlers
+        handlerLock.unlock()
+
         if output is AVCaptureVideoDataOutput {
-            for handler in videoHandlers {
+            for handler in vHandlers {
                 handler(sampleBuffer)
             }
         } else if output is AVCaptureAudioDataOutput {
-            for handler in audioHandlers {
+            for handler in aHandlers {
                 handler(sampleBuffer)
             }
         }

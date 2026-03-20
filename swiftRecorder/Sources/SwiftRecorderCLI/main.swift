@@ -106,16 +106,16 @@ func cmdRecord(args: [String]) {
     var i = 0
     while i < args.count {
         switch args[i] {
-        case "--camera":    i += 1; cameraIndex = Int(args[i]) ?? 0
-        case "--audio":     i += 1; audioIndex = Int(args[i])
-        case "--width":     i += 1; width = Int(args[i])
-        case "--height":    i += 1; height = Int(args[i])
-        case "--fps":       i += 1; fps = Double(args[i])
-        case "--codec":     i += 1; codecName = args[i]
-        case "--container": i += 1; containerName = args[i]
-        case "--duration":  i += 1; duration = Double(args[i]) ?? 10
-        case "--output":    i += 1; outputDir = URL(fileURLWithPath: args[i])
-        case "--name":      i += 1; baseName = args[i]
+        case "--camera":    i += 1; guard i < args.count else { print("Error: --camera requires a value"); exit(1) }; cameraIndex = Int(args[i]) ?? 0
+        case "--audio":     i += 1; guard i < args.count else { print("Error: --audio requires a value"); exit(1) }; audioIndex = Int(args[i])
+        case "--width":     i += 1; guard i < args.count else { print("Error: --width requires a value"); exit(1) }; width = Int(args[i])
+        case "--height":    i += 1; guard i < args.count else { print("Error: --height requires a value"); exit(1) }; height = Int(args[i])
+        case "--fps":       i += 1; guard i < args.count else { print("Error: --fps requires a value"); exit(1) }; fps = Double(args[i])
+        case "--codec":     i += 1; guard i < args.count else { print("Error: --codec requires a value"); exit(1) }; codecName = args[i]
+        case "--container": i += 1; guard i < args.count else { print("Error: --container requires a value"); exit(1) }; containerName = args[i]
+        case "--duration":  i += 1; guard i < args.count else { print("Error: --duration requires a value"); exit(1) }; duration = Double(args[i]) ?? 10
+        case "--output":    i += 1; guard i < args.count else { print("Error: --output requires a value"); exit(1) }; outputDir = URL(fileURLWithPath: args[i])
+        case "--name":      i += 1; guard i < args.count else { print("Error: --name requires a value"); exit(1) }; baseName = args[i]
         default: break
         }
         i += 1
@@ -193,8 +193,17 @@ func cmdRecord(args: [String]) {
 
     captureSession.start()
 
-    // Small delay to let the session warm up
-    Thread.sleep(forTimeInterval: 0.5)
+    // Poll for session readiness (USB cameras may take time to initialize)
+    var warmupAttempts = 0
+    let maxWarmup = 20  // 2 seconds max
+    while captureSession.activeWidth == 0 || captureSession.activeHeight == 0 {
+        Thread.sleep(forTimeInterval: 0.1)
+        warmupAttempts += 1
+        if warmupAttempts >= maxWarmup {
+            print("Warning: camera may not be ready (0x0 dimensions after \(maxWarmup * 100)ms)")
+            break
+        }
+    }
 
     do {
         let url = try engine.startRecording(

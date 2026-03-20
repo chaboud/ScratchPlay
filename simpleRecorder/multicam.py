@@ -85,7 +85,7 @@ class CameraStream:
 
         os.makedirs(self.output_dir, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        ext = ".mov" if self.config.codec in ("h264", "avc") else ".mov"
+        ext = ".mov" if self.config.codec in ("h264", "avc", "hevc", "h265") else ".avi"
         self._output_path = os.path.join(
             self.output_dir, f"{self.base_name}_{self.config.name}_{ts}{ext}"
         )

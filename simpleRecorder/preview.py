@@ -267,7 +267,7 @@ class PreviewWindow:
 
             h, w = current_frame.shape[:2]
             fourcc = cv2.VideoWriter_fourcc(*"XVID")
-            fps = self.waveshare_fps if self.mode == "waveshare" else 15
+            fps = self.waveshare_fps if self.mode == "waveshare" else (self._cam.fps if hasattr(self._cam, 'fps') else 25)
             self._writer = cv2.VideoWriter(video_path, fourcc, fps, (w, h))
 
             # Start radiometric sidecar

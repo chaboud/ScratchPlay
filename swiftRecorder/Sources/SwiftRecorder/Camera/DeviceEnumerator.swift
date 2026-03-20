@@ -51,7 +51,7 @@ public final class DeviceEnumerator {
         let discovery = AVCaptureDevice.DiscoverySession(
             deviceTypes: [
                 .builtInWideAngleCamera,
-                .externalUnknown,
+                .external,
             ],
             mediaType: .video,
             position: .unspecified
@@ -70,7 +70,7 @@ public final class DeviceEnumerator {
     /// All audio capture devices.
     public static func audioDevices() -> [DeviceInfo] {
         let discovery = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.builtInMicrophone, .externalUnknown],
+            deviceTypes: [.builtInMicrophone, .external],
             mediaType: .audio,
             position: .unspecified
         )

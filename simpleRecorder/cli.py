@@ -66,7 +66,7 @@ def parse_args():
     therm_p.add_argument("--camera", "-c", type=int, default=0)
     therm_p.add_argument("--audio", "-a", type=int, default=None)
     therm_p.add_argument("--colormap", default="inferno",
-                         help="inferno, jet, hot, turbo, magma, rainbow, white_hot, black_hot")
+                         help="inferno, jet, hot, bone, turbo, magma, rainbow, ironbow, white_hot, black_hot")
     therm_p.add_argument("--waveshare-fps", type=int, default=15)
     therm_p.add_argument("--range-min", type=float, default=None,
                          help="Lock colormap min temperature (C)")

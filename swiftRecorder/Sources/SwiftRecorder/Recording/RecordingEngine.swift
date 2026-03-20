@@ -129,10 +129,10 @@ public final class RecordingEngine: ObservableObject {
                 AVVideoExpectedSourceFrameRateKey: fps,
                 AVVideoMaxKeyFrameIntervalKey: Int(fps * 2),  // keyframe every 2s
             ]
-            // Request hardware acceleration
-            compression[AVVideoProfileLevelKey] = codec == .h264
-                ? AVVideoProfileLevelH264HighAutoLevel
-                : nil  // HEVC auto-selects profile
+            // Set profile level for H.264 (HEVC auto-selects, no key needed)
+            if codec == .h264 {
+                compression[AVVideoProfileLevelKey] = AVVideoProfileLevelH264HighAutoLevel
+            }
             videoSettings[AVVideoCompressionPropertiesKey] = compression
         }
 
@@ -190,6 +190,9 @@ public final class RecordingEngine: ObservableObject {
     }
 
     /// Stop recording and finalize the file.
+    ///
+    /// The completion handler is called on the writer queue (not main thread)
+    /// so it is safe to use with semaphores in CLI contexts.
     public func stopRecording(completion: ((URL?, TimeInterval) -> Void)? = nil) {
         writerQueue.async { [weak self] in
             guard let self = self, let writer = self.assetWriter else {
@@ -197,26 +200,33 @@ public final class RecordingEngine: ObservableObject {
                 return
             }
 
-            let duration = self.recordingDuration
+            let duration: TimeInterval
+            if let start = self.sessionStartDate {
+                duration = Date().timeIntervalSince(start)
+            } else {
+                duration = self.recordingDuration
+            }
             let url = self.currentOutputURL
 
             self.videoWriterInput?.markAsFinished()
             self.audioWriterInput?.markAsFinished()
 
-            writer.finishWriting {
+            writer.finishWriting { [weak self] in
+                // Clean up on main thread for UI updates
                 DispatchQueue.main.async {
-                    self.isRecording = false
-                    self._stopTimer()
-                    self.assetWriter = nil
-                    self.videoWriterInput = nil
-                    self.audioWriterInput = nil
-                    self.startTime = nil
-
-                    if let url = url {
-                        print("Recording stopped: \(url.lastPathComponent) (\(String(format: "%.1f", duration))s)")
-                    }
-                    completion?(url, duration)
+                    self?.isRecording = false
+                    self?._stopTimer()
+                    self?.assetWriter = nil
+                    self?.videoWriterInput = nil
+                    self?.audioWriterInput = nil
+                    self?.startTime = nil
                 }
+
+                if let url = url {
+                    print("Recording stopped: \(url.lastPathComponent) (\(String(format: "%.1f", duration))s)")
+                }
+                // Call completion on writer queue, not main, to avoid deadlock in CLI
+                completion?(url, duration)
             }
         }
     }
@@ -240,7 +250,10 @@ public final class RecordingEngine: ObservableObject {
             }
 
             input.append(sampleBuffer)
-            self.framesWritten += 1
+            let newCount = self.framesWritten + 1
+            DispatchQueue.main.async {
+                self.framesWritten = newCount
+            }
         }
     }
 
