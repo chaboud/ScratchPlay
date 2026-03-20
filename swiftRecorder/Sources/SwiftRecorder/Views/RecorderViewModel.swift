@@ -128,19 +128,13 @@ public final class RecorderViewModel: ObservableObject {
             self?.audioMonitor.processSampleBuffer(buffer)
         }
 
-        // Forward published state changes
-        recordingEngine.objectWillChange.sink { [weak self] in
-            self?.objectWillChange.send()
-        }.store(in: &cancellables)
-
-        captureSession.objectWillChange.sink { [weak self] in
-            self?.objectWillChange.send()
-        }.store(in: &cancellables)
-
-        // Note: audioMonitor is NOT forwarded through objectWillChange here.
-        // AudioMeterView observes it directly via @ObservedObject to avoid
-        // re-rendering the entire RecorderView on every audio level update
-        // (~47 times/second), which would break TextField editing.
+        // IMPORTANT: Do NOT forward objectWillChange from child objects
+        // (recordingEngine, captureSession, audioMonitor) through this ViewModel.
+        // Doing so causes the entire RecorderView to re-render on every change
+        // (audio levels at ~47Hz, frame counts at ~30Hz, duration timer at 2Hz),
+        // which destroys TextField editing focus on macOS.
+        //
+        // Instead, child views observe these objects directly via @ObservedObject.
     }
 
     func refreshDevices() {

@@ -3,6 +3,10 @@ import SwiftUI
 
 /// NSViewRepresentable wrapping AVCaptureVideoPreviewLayer.
 /// This is GPU-composited — no CPU frame copying for preview.
+///
+/// The preview layer is added as a sublayer (NOT as the root layer)
+/// to avoid creating a "layer-hosting view" which interferes with
+/// macOS focus/responder chain and breaks TextField editing.
 public struct CameraPreviewView: NSViewRepresentable {
     let session: AVCaptureSession
 
@@ -26,14 +30,20 @@ private class PreviewNSView: NSView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         wantsLayer = true
-        layer = previewLayer
+        // Add as sublayer — do NOT replace root layer with `layer = previewLayer`.
+        // Replacing the root layer creates a "layer-hosting view" that breaks
+        // the window's focus/responder chain, making TextFields uneditable.
+        layer?.addSublayer(previewLayer)
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
+    // Prevent this view from ever stealing focus or intercepting events
     override var acceptsFirstResponder: Bool { false }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override func becomeFirstResponder() -> Bool { false }
 
     override func layout() {
         super.layout()
