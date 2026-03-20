@@ -166,32 +166,26 @@ class RecorderApp:
         ttk.Checkbutton(ovl_frame, text="Meters", variable=self.preview_meters_var).grid(row=0, column=1, padx=4)
 
         # --- Main Buttons ---
+        # macOS Aqua ignores bg/fg on tk.Button, so we use colored Frame+Label
+        # widgets that respond to clicks.
         btn_frame = ttk.Frame(self.root, padding=8)
         btn_frame.grid(row=4, column=0, sticky="ew", **pad)
 
-        self.record_btn = tk.Button(
-            btn_frame, text="● RECORD", font=("Helvetica", 14, "bold"),
-            fg="white", bg="#cc0000", activebackground="#ff3333",
-            width=10, height=2, command=self._toggle_record,
+        self.record_btn = self._make_color_button(
+            btn_frame, "● RECORD", "#cc0000", self._toggle_record, font_size=14,
         )
         self.record_btn.pack(side="left", padx=4)
 
-        tk.Button(
-            btn_frame, text="PREVIEW", font=("Helvetica", 12, "bold"),
-            fg="white", bg="#336699", activebackground="#4488bb",
-            width=10, height=2, command=self._open_preview,
+        self._make_color_button(
+            btn_frame, "PREVIEW", "#336699", self._open_preview,
         ).pack(side="left", padx=4)
 
-        tk.Button(
-            btn_frame, text="THERMAL", font=("Helvetica", 12, "bold"),
-            fg="white", bg="#cc6600", activebackground="#ee8833",
-            width=10, height=2, command=self._open_thermal,
+        self._make_color_button(
+            btn_frame, "THERMAL", "#cc6600", self._open_thermal,
         ).pack(side="left", padx=4)
 
-        tk.Button(
-            btn_frame, text="MULTI", font=("Helvetica", 12, "bold"),
-            fg="white", bg="#669933", activebackground="#88bb55",
-            width=8, height=2, command=self._open_multicam,
+        self._make_color_button(
+            btn_frame, "MULTI", "#669933", self._open_multicam,
         ).pack(side="left", padx=4)
 
         # --- Thermal Options ---
@@ -225,6 +219,61 @@ class RecorderApp:
         ttk.Label(self.root, textvariable=self.status_var, anchor="w").grid(
             row=6, column=0, sticky="ew", padx=8, pady=4,
         )
+
+    # --- Colored button helper (macOS Aqua ignores bg on tk.Button) ---
+
+    def _make_color_button(self, parent, text, color, command, font_size=12):
+        """Create a colored button using Frame+Label (works on macOS Aqua)."""
+        frame = tk.Frame(parent, bg=color, cursor="hand2")
+        frame.configure(highlightbackground=color, highlightthickness=2)
+
+        label = tk.Label(
+            frame, text=text, font=("Helvetica", font_size, "bold"),
+            fg="white", bg=color, padx=16, pady=10,
+        )
+        label.pack()
+
+        # Bind click on both frame and label
+        for widget in (frame, label):
+            widget.bind("<Button-1>", lambda e, cmd=command: cmd())
+            widget.bind("<Enter>", lambda e, f=frame, l=label: (
+                f.configure(bg=self._lighten(color)),
+                l.configure(bg=self._lighten(color)),
+            ))
+            widget.bind("<Leave>", lambda e, f=frame, l=label, c=color: (
+                f.configure(bg=c), l.configure(bg=c),
+            ))
+
+        # Store references for updating text/color later
+        frame._label = label
+        frame._color = color
+        return frame
+
+    @staticmethod
+    def _lighten(hex_color, factor=0.3):
+        """Lighten a hex color by a factor."""
+        r = int(hex_color[1:3], 16)
+        g = int(hex_color[3:5], 16)
+        b = int(hex_color[5:7], 16)
+        r = min(255, int(r + (255 - r) * factor))
+        g = min(255, int(g + (255 - g) * factor))
+        b = min(255, int(b + (255 - b) * factor))
+        return f"#{r:02x}{g:02x}{b:02x}"
+
+    def _set_button_style(self, btn_frame, text, color):
+        """Update a color button's text and color."""
+        btn_frame._label.configure(text=text, bg=color, fg="white")
+        btn_frame.configure(bg=color, highlightbackground=color)
+        btn_frame._color = color
+        # Re-bind hover to new color
+        for widget in (btn_frame, btn_frame._label):
+            widget.bind("<Enter>", lambda e, f=btn_frame, l=btn_frame._label: (
+                f.configure(bg=self._lighten(color)),
+                l.configure(bg=self._lighten(color)),
+            ))
+            widget.bind("<Leave>", lambda e, f=btn_frame, l=btn_frame._label, c=color: (
+                f.configure(bg=c), l.configure(bg=c),
+            ))
 
     # --- Device handling ---
 
@@ -360,7 +409,7 @@ class RecorderApp:
 
         self.recording = True
         self.clip_count += 1
-        self.record_btn.config(text="■ STOP", bg="#333333", activebackground="#555555")
+        self._set_button_style(self.record_btn, "■ STOP", "#333333")
         self.status_var.set(f"Recording #{self.clip_count}: {os.path.basename(path)}")
         self.timer_running = True
         self._update_timer()
@@ -372,7 +421,7 @@ class RecorderApp:
             self.status_var.set(f"Saved: {os.path.basename(path)} ({dur:.1f}s)")
         self.recording = False
         self.session = None
-        self.record_btn.config(text="● RECORD", bg="#cc0000", activebackground="#ff3333")
+        self._set_button_style(self.record_btn, "● RECORD", "#cc0000")
 
     def _update_timer(self):
         if not self.timer_running or not self.session:
