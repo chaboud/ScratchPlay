@@ -12,13 +12,13 @@ A simple Python video recorder for macOS that captures from connected cameras us
 - Audio recording from selectable input device
 - Three usage modes:
   - **One-shot CLI** — record a fixed-duration clip
-  - **Interactive CLI** — spacebar to start/stop clips, runs indefinitely
-  - **GUI** — tkinter window with dropdowns and a record button
+  - **Interactive CLI** — spacebar to start/stop clips (add `--preview` for live window)
+  - **GUI** — multiple options: tkinter, PySide6, Dear PyGui, or Textual TUI
 
 ## Requirements
 
 - **macOS** (uses AVFoundation)
-- **Python 3.9+**
+- **Python 3.9–3.13** (3.14 may have tkinter issues on Homebrew; CLI still works)
 - **ffmpeg** — install with `brew install ffmpeg`
 - Python packages: `pip install -r requirements.txt`
 
@@ -81,12 +81,18 @@ Same options as `record` plus:
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--max-length` | none | Auto-stop clip after N seconds |
+| `--preview` | off | Open live preview window (R key to record) |
+| `--pre-roll` | 5 | Pre-roll buffer seconds (with `--preview`) |
+| `--no-overlay` | off | Disable timecode overlay (with `--preview`) |
+| `--target, -T` | none | Target output path (overrides -o, -n, container) |
 
-### `python gui.py`
-Opens a tkinter window with:
-- Camera and audio device dropdowns (with refresh)
-- Resolution and FPS dropdowns (auto-populated from camera probe)
-- Codec (H.264/HEVC) and container (MOV/MP4) selectors
-- CRF quality spinner
-- Output folder browser and base name field
-- Record/Stop button with elapsed time display
+### GUI Options
+
+All GUIs provide the same interface: device/format selectors, record/preview/thermal/multicam buttons.
+
+| Command | Toolkit | Install |
+|---------|---------|---------|
+| `python gui.py` | Tkinter | `brew install python-tk@3.13` |
+| `python gui_pyside.py` | PySide6 (Qt) | `pip install PySide6` |
+| `python gui_dearpygui.py` | Dear PyGui | `pip install dearpygui` |
+| `python gui_textual.py` | Textual (TUI) | `pip install textual` |

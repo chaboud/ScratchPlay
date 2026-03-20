@@ -3,3 +3,8 @@ numpy>=1.24.0
 
 # Optional: Waveshare/Meridian MI48 thermal cameras
 # pip install senxor
+
+# Optional GUI alternatives (pick one, or use tkinter which is built-in):
+# pip install PySide6        # gui_pyside.py
+# pip install dearpygui      # gui_dearpygui.py
+# pip install textual        # gui_textual.py

@@ -1,7 +1,7 @@
 # ScratchPlay
 
 ## Project Overview
-This is a collection of utility tools. Contains `simpleRecorder` (Python) and `swiftRecorder` (native Swift/macOS).
+This is a collection of utility tools. Contains `simpleRecorder` (Python), `swiftRecorder` (native Swift/macOS), and `flutterRecorder` (Flutter/Dart macOS).
 
 ## simpleRecorder
 - **Location**: `simpleRecorder/`
@@ -9,7 +9,11 @@ This is a collection of utility tools. Contains `simpleRecorder` (Python) and `s
 - **Dependencies**: `opencv-python`, `numpy` (see `simpleRecorder/requirements.txt`)
 - **Optional dependency**: `senxor` for Waveshare/Meridian MI48 thermal cameras
 - **External requirement**: `ffmpeg` must be installed (`brew install ffmpeg`)
-- **GUI requirement**: `tkinter` (`brew install python-tk@3.13` if missing)
+- **GUI options** (pick one):
+  - `gui.py` — Tkinter (built-in, but needs `brew install python-tk@3.13` on Homebrew)
+  - `gui_pyside.py` — PySide6/Qt (`pip install PySide6`)
+  - `gui_dearpygui.py` — Dear PyGui (`pip install dearpygui`)
+  - `gui_textual.py` — Textual terminal UI (`pip install textual`)
 - **Platform**: macOS (uses AVFoundation via ffmpeg)
 
 ### Architecture
@@ -24,6 +28,9 @@ This is a collection of utility tools. Contains `simpleRecorder` (Python) and `s
 - `audiometer.py` — Real-time audio level meter (VU meter) via ffmpeg astats
 - `cli.py` — CLI: devices, formats, record, interactive, preview, thermal, thermal-scan, multicam
 - `gui.py` — Tkinter GUI with record/preview/thermal/multicam buttons
+- `gui_pyside.py` — PySide6 (Qt) GUI, same features as gui.py
+- `gui_dearpygui.py` — Dear PyGui GUI, same features as gui.py
+- `gui_textual.py` — Textual terminal UI, same features as gui.py
 
 ### Running
 ```bash
@@ -41,6 +48,9 @@ python cli.py thermal --range-min 20 --range-max 45  # locked range
 python cli.py thermal-scan                      # detect thermal cameras
 python cli.py multicam --cameras 0,1,2          # multi-cam recording
 python gui.py                                   # launch GUI (requires tkinter)
+python gui_pyside.py                            # PySide6 GUI (pip install PySide6)
+python gui_dearpygui.py                         # Dear PyGui GUI (pip install dearpygui)
+python gui_textual.py                           # Textual TUI (pip install textual)
 ```
 
 ### Key Features
@@ -88,3 +98,24 @@ swift run swiftrecorder-cli record --duration 30  # headless recording
 - Framework-level A/V sync
 - Camera controls (exposure, focus, WB, ISO)
 - Lower power consumption for long sessions
+
+## flutterRecorder
+- **Location**: `flutterRecorder/`
+- **Language**: Dart/Flutter
+- **Build**: `flutter run -d macos` or `flutter build macos`
+- **Platform**: macOS
+
+### Architecture
+- `lib/main.dart` — Full app: device enumeration (via ffmpeg), recording (ffmpeg subprocess), preview/thermal/multicam (launches Python CLI)
+
+### Running
+```bash
+cd flutterRecorder
+flutter run -d macos
+```
+
+### Notes
+- Enumerates devices by parsing `ffmpeg -f avfoundation -list_devices true` output
+- Records by spawning ffmpeg as a subprocess
+- Preview/Thermal/MultiCam buttons launch `python cli.py` subcommands
+- Material 3 design with color-coded action buttons
