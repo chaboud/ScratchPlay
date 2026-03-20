@@ -363,7 +363,7 @@ class RecorderApp(QMainWindow):
             self.res_combo.blockSignals(False)
             self._on_resolution_changed()
         else:
-            self.res_combo.addItems(["3840x2160", "1920x1080", "1280x720", "640x480"])
+            self.res_combo.addItems(["1920x1080", "1280x720", "640x480"])
             self.res_combo.setCurrentIndex(0)
             self.res_combo.blockSignals(False)
             self.fps_combo.clear()

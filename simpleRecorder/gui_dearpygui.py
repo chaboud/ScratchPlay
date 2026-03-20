@@ -369,7 +369,7 @@ class RecorderApp:
             dpg.set_value(self.res_combo, res_strs[0])
             self._on_resolution_changed()
         else:
-            fallback = ["3840x2160", "1920x1080", "1280x720", "640x480"]
+            fallback = ["1920x1080", "1280x720", "640x480"]
             dpg.configure_item(self.res_combo, items=fallback)
             dpg.set_value(self.res_combo, fallback[0])
             fps_fallback = ["24", "30", "60"]

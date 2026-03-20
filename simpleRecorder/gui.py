@@ -262,9 +262,9 @@ class RecorderApp:
             self.res_combo.current(0)
             self._on_resolution_changed()
         else:
-            self.res_combo["values"] = ["3840x2160", "1920x1080", "1280x720", "640x480"]
+            self.res_combo["values"] = ["1920x1080", "1280x720", "640x480"]
             self.res_combo.current(0)
-            self.fps_combo["values"] = ["24", "30", "60"]
+            self.fps_combo["values"] = ["24", "30"]
             self.fps_combo.current(len(self.fps_combo["values"]) - 1)
 
         self.status_var.set("Ready")
