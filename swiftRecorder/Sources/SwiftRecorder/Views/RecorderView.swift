@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 import SwiftUI
 
@@ -112,6 +113,41 @@ public struct RecorderView: View {
                         }
                         .labelsHidden()
                         .frame(width: 70)
+                    }
+
+                    Spacer()
+                }
+
+                // Output settings
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text("Output Folder").font(.caption).foregroundColor(.secondary)
+                        HStack {
+                            TextField("Path", text: Binding(
+                                get: { viewModel.outputDirectory.path },
+                                set: { viewModel.outputDirectory = URL(fileURLWithPath: $0) }
+                            ))
+                            .frame(width: 300)
+                            .textFieldStyle(.roundedBorder)
+
+                            Button("Browse...") {
+                                let panel = NSOpenPanel()
+                                panel.canChooseFiles = false
+                                panel.canChooseDirectories = true
+                                panel.allowsMultipleSelection = false
+                                panel.directoryURL = viewModel.outputDirectory
+                                if panel.runModal() == .OK, let url = panel.url {
+                                    viewModel.outputDirectory = url
+                                }
+                            }
+                        }
+                    }
+
+                    VStack(alignment: .leading) {
+                        Text("Base Name").font(.caption).foregroundColor(.secondary)
+                        TextField("recording", text: $viewModel.baseName)
+                            .frame(width: 150)
+                            .textFieldStyle(.roundedBorder)
                     }
 
                     Spacer()

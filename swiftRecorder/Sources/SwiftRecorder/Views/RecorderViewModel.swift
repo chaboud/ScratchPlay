@@ -30,6 +30,9 @@ public final class RecorderViewModel: ObservableObject {
     @Published var selectedCodec: RecordingEngine.VideoCodec = .h264
     @Published var selectedContainer: RecordingEngine.Container = .mov
 
+    @Published var outputDirectory: URL = FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first!
+    @Published var baseName: String = "recording"
+
     // MARK: - Objects
 
     let captureSession = CaptureSession()
@@ -151,6 +154,8 @@ public final class RecorderViewModel: ObservableObject {
         } else {
             recordingEngine.codec = selectedCodec
             recordingEngine.container = selectedContainer
+            recordingEngine.outputDirectory = outputDirectory
+            recordingEngine.baseName = baseName
 
             do {
                 let _ = try recordingEngine.startRecording(
