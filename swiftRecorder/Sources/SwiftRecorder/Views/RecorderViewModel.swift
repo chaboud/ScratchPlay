@@ -30,8 +30,56 @@ public final class RecorderViewModel: ObservableObject {
     @Published var selectedCodec: RecordingEngine.VideoCodec = .h264
     @Published var selectedContainer: RecordingEngine.Container = .mov
 
+    @Published var selectedQuality: VideoQuality = .high
+    @Published var customBitrateMbps: String = ""
+
     @Published var outputPath: String = FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first!.path
     @Published var baseName: String = "recording"
+
+    enum VideoQuality: String, CaseIterable, Identifiable {
+        case low = "Low"
+        case medium = "Medium"
+        case high = "High"
+        case max = "Max"
+        case custom = "Custom"
+
+        var id: String { rawValue }
+
+        /// Multiplier applied to the default bitrate
+        var multiplier: Double {
+            switch self {
+            case .low: return 0.4
+            case .medium: return 0.7
+            case .high: return 1.0
+            case .max: return 2.0
+            case .custom: return 1.0
+            }
+        }
+    }
+
+    /// Computed bitrate based on current settings
+    var effectiveBitrate: Int? {
+        if selectedQuality == .custom {
+            if let mbps = Double(customBitrateMbps), mbps > 0 {
+                return Int(mbps * 1_000_000)
+            }
+            return nil  // let system decide
+        }
+        let base = RecordingEngine.defaultBitRate(
+            width: captureSession.activeWidth,
+            height: captureSession.activeHeight,
+            fps: captureSession.activeFPS,
+            codec: selectedCodec
+        )
+        return Int(Double(base) * selectedQuality.multiplier)
+    }
+
+    var effectiveBitrateMbps: String {
+        if let br = effectiveBitrate {
+            return String(format: "%.1f Mbps", Double(br) / 1_000_000)
+        }
+        return "Auto"
+    }
 
     var outputDirectory: URL {
         URL(fileURLWithPath: outputPath)
@@ -160,6 +208,7 @@ public final class RecorderViewModel: ObservableObject {
             recordingEngine.container = selectedContainer
             recordingEngine.outputDirectory = outputDirectory
             recordingEngine.baseName = baseName
+            recordingEngine.videoBitRate = effectiveBitrate
 
             do {
                 let _ = try recordingEngine.startRecording(

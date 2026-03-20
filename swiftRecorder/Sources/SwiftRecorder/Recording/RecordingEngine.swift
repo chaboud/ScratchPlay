@@ -287,7 +287,7 @@ public final class RecordingEngine: ObservableObject {
     // MARK: - Helpers
 
     /// Sensible default bit rate based on resolution and codec.
-    static func defaultBitRate(width: Int, height: Int, fps: Double, codec: VideoCodec) -> Int {
+    public static func defaultBitRate(width: Int, height: Int, fps: Double, codec: VideoCodec) -> Int {
         let pixels = width * height
         let base: Double
         switch codec {

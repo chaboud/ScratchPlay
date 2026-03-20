@@ -115,6 +115,33 @@ public struct RecorderView: View {
                         .frame(width: 70)
                     }
 
+                    VStack(alignment: .leading) {
+                        Text("Quality").font(.caption).foregroundColor(.secondary)
+                        Picker("Quality", selection: $viewModel.selectedQuality) {
+                            ForEach(RecorderViewModel.VideoQuality.allCases) { q in
+                                Text(q.rawValue).tag(q)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 90)
+                    }
+
+                    if viewModel.selectedQuality == .custom {
+                        VStack(alignment: .leading) {
+                            Text("Bitrate (Mbps)").font(.caption).foregroundColor(.secondary)
+                            TextField("e.g. 8.0", text: $viewModel.customBitrateMbps)
+                                .frame(width: 70)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                    }
+
+                    VStack(alignment: .leading) {
+                        Text("").font(.caption)
+                        Text(viewModel.effectiveBitrateMbps)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(.secondary)
+                    }
+
                     Spacer()
                 }
 
