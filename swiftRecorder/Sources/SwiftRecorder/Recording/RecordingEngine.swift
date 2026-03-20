@@ -86,6 +86,7 @@ public final class RecordingEngine: ObservableObject {
     private var sessionStartDate: Date?
     private var timer: Timer?
 
+    private var _internalFrameCount: Int = 0
     private let writerQueue = DispatchQueue(label: "com.swiftrecorder.writer")
 
     // MARK: - Init
@@ -174,6 +175,7 @@ public final class RecordingEngine: ObservableObject {
         self.audioWriterInput = audioInput
         self.startTime = nil
         self.framesWritten = 0
+        self._internalFrameCount = 0
         self.currentOutputURL = url
         self.sessionStartDate = Date()
 
@@ -250,9 +252,13 @@ public final class RecordingEngine: ObservableObject {
             }
 
             input.append(sampleBuffer)
-            let newCount = self.framesWritten + 1
-            DispatchQueue.main.async {
-                self.framesWritten = newCount
+            self._internalFrameCount += 1
+            // Throttle UI updates to every 10 frames to avoid killing TextFields
+            if self._internalFrameCount % 10 == 0 {
+                let count = self._internalFrameCount
+                DispatchQueue.main.async {
+                    self.framesWritten = count
+                }
             }
         }
     }

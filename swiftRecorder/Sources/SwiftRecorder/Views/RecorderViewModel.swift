@@ -137,9 +137,10 @@ public final class RecorderViewModel: ObservableObject {
             self?.objectWillChange.send()
         }.store(in: &cancellables)
 
-        audioMonitor.objectWillChange.sink { [weak self] in
-            self?.objectWillChange.send()
-        }.store(in: &cancellables)
+        // Note: audioMonitor is NOT forwarded through objectWillChange here.
+        // AudioMeterView observes it directly via @ObservedObject to avoid
+        // re-rendering the entire RecorderView on every audio level update
+        // (~47 times/second), which would break TextField editing.
     }
 
     func refreshDevices() {

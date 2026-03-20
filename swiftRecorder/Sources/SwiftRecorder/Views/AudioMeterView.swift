@@ -1,18 +1,15 @@
 import SwiftUI
 
 /// A VU meter bar showing audio levels with peak hold.
+/// Observes AudioLevelMonitor directly to avoid re-rendering the parent view.
 public struct AudioMeterView: View {
-    let peakLevel: Float     // dBFS
-    let averageLevel: Float  // dBFS
-    let peakHold: Float      // dBFS
+    @ObservedObject var monitor: AudioLevelMonitor
 
     private let minDB: Float = -60
     private let maxDB: Float = 0
 
-    public init(peakLevel: Float, averageLevel: Float, peakHold: Float) {
-        self.peakLevel = peakLevel
-        self.averageLevel = averageLevel
-        self.peakHold = peakHold
+    public init(monitor: AudioLevelMonitor) {
+        self.monitor = monitor
     }
 
     private func fraction(_ db: Float) -> CGFloat {
@@ -28,7 +25,6 @@ public struct AudioMeterView: View {
 
             GeometryReader { geo in
                 let w = geo.size.width
-                let h = geo.size.height
 
                 ZStack(alignment: .leading) {
                     // Background
@@ -37,7 +33,7 @@ public struct AudioMeterView: View {
 
                     // RMS bar with color zones
                     HStack(spacing: 0) {
-                        let rmsFrac = fraction(averageLevel)
+                        let rmsFrac = fraction(monitor.averageLevel)
                         let greenEnd: CGFloat = fraction(-12)
                         let yellowEnd: CGFloat = fraction(-3)
 
@@ -67,13 +63,13 @@ public struct AudioMeterView: View {
                     Rectangle()
                         .fill(Color.white)
                         .frame(width: 2)
-                        .offset(x: fraction(peakLevel) * w)
+                        .offset(x: fraction(monitor.peakLevel) * w)
 
                     // Peak hold indicator (yellow line)
                     Rectangle()
                         .fill(Color.yellow.opacity(0.8))
                         .frame(width: 1)
-                        .offset(x: fraction(peakHold) * w)
+                        .offset(x: fraction(monitor.peakHold) * w)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 2))
             }

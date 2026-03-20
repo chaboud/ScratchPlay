@@ -176,11 +176,7 @@ public struct RecorderView: View {
 
                 // Audio level meter
                 if viewModel.selectedAudioDevice != nil {
-                    AudioMeterView(
-                        peakLevel: viewModel.audioMonitor.peakLevel,
-                        averageLevel: viewModel.audioMonitor.averageLevel,
-                        peakHold: viewModel.audioMonitor.peakHold
-                    )
+                    AudioMeterView(monitor: viewModel.audioMonitor)
                 }
 
                 // Record button

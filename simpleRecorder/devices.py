@@ -135,16 +135,16 @@ def get_max_fps(formats, width, height):
 def get_best_defaults(video_index):
     """Probe a camera and return (width, height, fps) at max resolution and max rate.
 
-    Returns (3840, 2160, 60) as fallback if probing yields nothing.
+    Returns (1920, 1080, 30) as fallback if probing yields nothing.
     """
     formats = probe_camera_formats(video_index)
     res = get_max_resolution(formats)
     if res is None:
-        return 3840, 2160, 60
+        return 1920, 1080, 30
     w, h = res
     fps = get_max_fps(formats, w, h)
     if fps is None:
-        fps = 60
+        fps = 30
     return w, h, fps
 
 
