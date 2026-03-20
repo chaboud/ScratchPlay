@@ -134,8 +134,6 @@ class RecorderApp:
         self.name_input = None
         self.preview_tc_check = None
         self.preview_meters_check = None
-        self.record_tc_check = None
-        self.record_meters_check = None
         self.record_btn = None
         self.thermal_mode_combo = None
         self.colormap_combo = None
@@ -220,23 +218,14 @@ class RecorderApp:
 
             dpg.add_spacer(height=4)
 
-            # --- Overlays ---
-            with dpg.collapsing_header(label="Overlays", default_open=True):
+            # --- Preview Overlays ---
+            with dpg.collapsing_header(label="Preview Overlays", default_open=True):
                 with dpg.group(horizontal=True):
-                    dpg.add_text("Preview:")
                     self.preview_tc_check = dpg.add_checkbox(
                         label="Timecode", default_value=True,
                     )
                     self.preview_meters_check = dpg.add_checkbox(
                         label="Meters", default_value=True,
-                    )
-                with dpg.group(horizontal=True):
-                    dpg.add_text("Recording:")
-                    self.record_tc_check = dpg.add_checkbox(
-                        label="Timecode", default_value=False,
-                    )
-                    self.record_meters_check = dpg.add_checkbox(
-                        label="Meters", default_value=False,
                     )
 
             # Folder dialog (hidden until Browse is clicked)
@@ -495,8 +484,6 @@ class RecorderApp:
         crf = dpg.get_value(self.crf_input)
         preview_tc = dpg.get_value(self.preview_tc_check)
         preview_meters = dpg.get_value(self.preview_meters_check)
-        record_tc = dpg.get_value(self.record_tc_check)
-        record_meters = dpg.get_value(self.record_meters_check)
 
         self._set_status("Opening preview...")
 
@@ -507,7 +494,7 @@ class RecorderApp:
                   dpg.get_value(self.dir_input),
                   dpg.get_value(self.name_input), preroll,
                   self._get_audio_index(),
-                  preview_tc, preview_meters, record_tc, record_meters),
+                  preview_tc, preview_meters, False, False),
             daemon=True,
         )
         p.start()

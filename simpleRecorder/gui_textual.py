@@ -335,25 +335,17 @@ class RecorderTUI(App):
                         classes="field-widget",
                     )
 
-            # --- Overlays ---
+            # --- Preview Overlays ---
             with Container(classes="section"):
-                yield Label("Overlays", classes="section-title")
+                yield Label("Preview Overlays", classes="section-title")
 
                 with Horizontal(classes="switch-row"):
                     yield Switch(value=True, id="preview-tc-switch")
-                    yield Label("Preview Timecode", classes="switch-label")
+                    yield Label("Timecode", classes="switch-label")
 
                 with Horizontal(classes="switch-row"):
                     yield Switch(value=True, id="preview-meters-switch")
-                    yield Label("Preview Meters", classes="switch-label")
-
-                with Horizontal(classes="switch-row"):
-                    yield Switch(value=False, id="record-tc-switch")
-                    yield Label("Recording Timecode", classes="switch-label")
-
-                with Horizontal(classes="switch-row"):
-                    yield Switch(value=False, id="record-meters-switch")
-                    yield Label("Recording Meters", classes="switch-label")
+                    yield Label("Meters", classes="switch-label")
 
             # --- Action Buttons ---
             with Horizontal(id="btn-row"):
@@ -670,8 +662,6 @@ class RecorderTUI(App):
 
         preview_tc = self.query_one("#preview-tc-switch", Switch).value
         preview_meters = self.query_one("#preview-meters-switch", Switch).value
-        record_tc = self.query_one("#record-tc-switch", Switch).value
-        record_meters = self.query_one("#record-meters-switch", Switch).value
 
         self._set_status("Opening preview...")
 
@@ -683,7 +673,7 @@ class RecorderTUI(App):
                 name_input.value, preroll,
                 self._get_audio_index(),
                 preview_tc, preview_meters,
-                record_tc, record_meters,
+                False, False,
             ),
             daemon=True,
         )

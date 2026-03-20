@@ -1,6 +1,7 @@
 import AppKit
 import AVFoundation
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Main SwiftUI view for the recorder app.
 /// Provides device selectors, format controls, preview, and record button.
@@ -155,15 +156,16 @@ public struct RecorderView: View {
                                 .textFieldStyle(.roundedBorder)
 
                             Button("Browse...") {
-                                let panel = NSOpenPanel()
-                                panel.canChooseFiles = false
-                                panel.canChooseDirectories = true
-                                panel.allowsMultipleSelection = false
+                                let panel = NSSavePanel()
                                 panel.directoryURL = viewModel.outputDirectory
+                                panel.nameFieldStringValue = viewModel.baseName
+                                panel.allowedContentTypes = [.movie]
+                                panel.canCreateDirectories = true
                                 if panel.runModal() == .OK, let url = panel.url {
-                                    // Keep existing base name, update directory
-                                    let base = viewModel.baseName
-                                    viewModel.savePath = url.appendingPathComponent(base).path
+                                    // Strip extension — RecordingEngine adds timestamp + ext
+                                    let dir = url.deletingLastPathComponent().path
+                                    let stem = url.deletingPathExtension().lastPathComponent
+                                    viewModel.savePath = dir + "/" + stem
                                 }
                             }
                         }

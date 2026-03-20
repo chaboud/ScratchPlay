@@ -156,21 +156,14 @@ class RecorderApp:
         self.name_var = tk.StringVar(value="recording")
         ttk.Entry(out_frame, textvariable=self.name_var, width=30).grid(row=1, column=1, sticky="ew", padx=4)
 
-        # --- Overlay Options ---
-        ovl_frame = ttk.LabelFrame(self.root, text="Overlays", padding=8)
+        # --- Preview Overlay Options ---
+        ovl_frame = ttk.LabelFrame(self.root, text="Preview Overlays", padding=8)
         ovl_frame.grid(row=3, column=0, sticky="ew", **pad)
 
-        ttk.Label(ovl_frame, text="Preview:").grid(row=0, column=0, sticky="w")
         self.preview_tc_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(ovl_frame, text="Timecode", variable=self.preview_tc_var).grid(row=0, column=1, padx=4)
+        ttk.Checkbutton(ovl_frame, text="Timecode", variable=self.preview_tc_var).grid(row=0, column=0, padx=4)
         self.preview_meters_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(ovl_frame, text="Meters", variable=self.preview_meters_var).grid(row=0, column=2, padx=4)
-
-        ttk.Label(ovl_frame, text="Recording:").grid(row=1, column=0, sticky="w")
-        self.record_tc_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(ovl_frame, text="Timecode", variable=self.record_tc_var).grid(row=1, column=1, padx=4)
-        self.record_meters_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(ovl_frame, text="Meters", variable=self.record_meters_var).grid(row=1, column=2, padx=4)
+        ttk.Checkbutton(ovl_frame, text="Meters", variable=self.preview_meters_var).grid(row=0, column=1, padx=4)
 
         # --- Main Buttons ---
         btn_frame = ttk.Frame(self.root, padding=8)
@@ -419,7 +412,7 @@ class RecorderApp:
                   self.name_var.get(), preroll,
                   self._get_audio_index(),
                   self.preview_tc_var.get(), self.preview_meters_var.get(),
-                  self.record_tc_var.get(), self.record_meters_var.get()),
+                  False, False),
             daemon=True,
         )
         p.start()

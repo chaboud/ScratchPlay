@@ -211,31 +211,17 @@ class RecorderApp(QMainWindow):
 
         main_layout.addWidget(out_group)
 
-        # --- Overlays ---
-        overlay_group = QGroupBox("Overlays")
-        overlay_layout = QVBoxLayout(overlay_group)
+        # --- Preview Overlays ---
+        overlay_group = QGroupBox("Preview Overlays")
+        overlay_layout = QHBoxLayout(overlay_group)
 
-        preview_row = QHBoxLayout()
-        preview_row.addWidget(QLabel("Preview:"))
         self.preview_tc_check = QCheckBox("Timecode")
         self.preview_tc_check.setChecked(True)
-        preview_row.addWidget(self.preview_tc_check)
+        overlay_layout.addWidget(self.preview_tc_check)
         self.preview_meters_check = QCheckBox("Meters")
         self.preview_meters_check.setChecked(True)
-        preview_row.addWidget(self.preview_meters_check)
-        preview_row.addStretch()
-        overlay_layout.addLayout(preview_row)
-
-        record_row = QHBoxLayout()
-        record_row.addWidget(QLabel("Recording:"))
-        self.record_tc_check = QCheckBox("Timecode")
-        self.record_tc_check.setChecked(False)
-        record_row.addWidget(self.record_tc_check)
-        self.record_meters_check = QCheckBox("Meters")
-        self.record_meters_check.setChecked(False)
-        record_row.addWidget(self.record_meters_check)
-        record_row.addStretch()
-        overlay_layout.addLayout(record_row)
+        overlay_layout.addWidget(self.preview_meters_check)
+        overlay_layout.addStretch()
 
         main_layout.addWidget(overlay_group)
 
@@ -528,8 +514,7 @@ class RecorderApp(QMainWindow):
                   self._get_audio_index(),
                   self.preview_tc_check.isChecked(),
                   self.preview_meters_check.isChecked(),
-                  self.record_tc_check.isChecked(),
-                  self.record_meters_check.isChecked()),
+                  False, False),
             daemon=True,
         )
         p.start()
