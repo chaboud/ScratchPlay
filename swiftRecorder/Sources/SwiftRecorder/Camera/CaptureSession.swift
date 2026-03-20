@@ -89,7 +89,7 @@ public final class CaptureSession: NSObject, ObservableObject {
         } else {
             // Use best defaults
             let (w, h, f) = DeviceEnumerator.bestDefaults(for: videoDevice)
-            if let (format, fpsRange) = DeviceEnumerator.bestFormat(
+            if let (format, _) = DeviceEnumerator.bestFormat(
                 for: videoDevice, width: w, height: h, fps: f
             ) {
                 try videoDevice.lockForConfiguration()

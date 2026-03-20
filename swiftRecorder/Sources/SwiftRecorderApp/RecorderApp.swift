@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftRecorder
 
 /// Entry point for the SwiftUI app.
 /// Can be launched from the CLI target or embedded in an .app bundle.
