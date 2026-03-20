@@ -175,29 +175,33 @@ private struct ControlsSection: View {
                 Spacer()
             }
 
-            // Output settings — single path field: /dir/basename
-            HStack {
+            // Output settings — separate folder + base name fields
+            HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading) {
-                    Text("Save to (folder / base name)").font(.caption).foregroundColor(.secondary)
+                    Text("Folder").font(.caption).foregroundColor(.secondary)
                     HStack {
-                        TextField("/path/to/basename", text: $viewModel.savePath)
-                            .frame(minWidth: 350)
+                        TextField("/path/to/folder", text: $viewModel.saveDirectory)
+                            .frame(minWidth: 300)
                             .textFieldStyle(.roundedBorder)
 
                         Button("Browse...") {
-                            let panel = NSSavePanel()
+                            let panel = NSOpenPanel()
                             panel.directoryURL = viewModel.outputDirectory
-                            panel.nameFieldStringValue = viewModel.baseName
-                            panel.allowedContentTypes = [.movie]
+                            panel.canChooseDirectories = true
+                            panel.canChooseFiles = false
                             panel.canCreateDirectories = true
                             if panel.runModal() == .OK, let url = panel.url {
-                                // Strip extension — RecordingEngine adds timestamp + ext
-                                let dir = url.deletingLastPathComponent().path
-                                let stem = url.deletingPathExtension().lastPathComponent
-                                viewModel.savePath = dir + "/" + stem
+                                viewModel.saveDirectory = url.path
                             }
                         }
                     }
+                }
+
+                VStack(alignment: .leading) {
+                    Text("Base name").font(.caption).foregroundColor(.secondary)
+                    TextField("recording", text: $viewModel.saveBaseName)
+                        .frame(width: 180)
+                        .textFieldStyle(.roundedBorder)
                 }
 
                 Spacer()
