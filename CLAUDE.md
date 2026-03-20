@@ -5,10 +5,11 @@ This is a collection of utility tools. Contains `simpleRecorder` (Python) and `s
 
 ## simpleRecorder
 - **Location**: `simpleRecorder/`
-- **Language**: Python 3.9+
+- **Language**: Python 3.9–3.13 (3.14 has issues with tkinter on Homebrew; CLI works but GUI may not)
 - **Dependencies**: `opencv-python`, `numpy` (see `simpleRecorder/requirements.txt`)
 - **Optional dependency**: `senxor` for Waveshare/Meridian MI48 thermal cameras
 - **External requirement**: `ffmpeg` must be installed (`brew install ffmpeg`)
+- **GUI requirement**: `tkinter` (`brew install python-tk@3.13` if missing)
 - **Platform**: macOS (uses AVFoundation via ffmpeg)
 
 ### Architecture
@@ -30,13 +31,16 @@ cd simpleRecorder
 python cli.py devices                           # list cameras and audio
 python cli.py formats -c 0                      # show camera formats
 python cli.py record -t 30                      # one-shot (max res/fps default)
+python cli.py record -t 30 --target ~/out.mov   # one-shot to specific path
 python cli.py interactive                       # spacebar start/stop clips
+python cli.py interactive --preview             # interactive with live preview window
+python cli.py interactive --preview --pre-roll 10  # preview + 10s pre-roll buffer
 python cli.py preview -c 0 --pre-roll 10        # preview with 10s pre-roll buffer
 python cli.py thermal -m infiray -c 2           # thermal preview
 python cli.py thermal --range-min 20 --range-max 45  # locked range
 python cli.py thermal-scan                      # detect thermal cameras
 python cli.py multicam --cameras 0,1,2          # multi-cam recording
-python gui.py                                   # launch GUI
+python gui.py                                   # launch GUI (requires tkinter)
 ```
 
 ### Key Features
