@@ -372,7 +372,7 @@ class RecorderApp:
             fallback = ["1920x1080", "1280x720", "640x480"]
             dpg.configure_item(self.res_combo, items=fallback)
             dpg.set_value(self.res_combo, fallback[0])
-            fps_fallback = ["24", "30", "60"]
+            fps_fallback = ["24", "30"]
             dpg.configure_item(self.fps_combo, items=fps_fallback)
             dpg.set_value(self.fps_combo, fps_fallback[-1])
 
@@ -387,7 +387,7 @@ class RecorderApp:
         if fps_list:
             fps_strs = [str(int(f)) if f == int(f) else str(f) for f in fps_list]
         else:
-            fps_strs = ["24", "30", "60"]
+            fps_strs = ["24", "30"]
         dpg.configure_item(self.fps_combo, items=fps_strs)
         dpg.set_value(self.fps_combo, fps_strs[-1])
 
@@ -436,7 +436,13 @@ class RecorderApp:
             base_name=dpg.get_value(self.name_input),
         )
 
-        path = self.session.start()
+        try:
+            path = self.session.start()
+        except RuntimeError as e:
+            self.session = None
+            self._set_status(f"Record failed: {e}")
+            return
+
         self.recording = True
         self.clip_count += 1
         self._record_start = time.time()

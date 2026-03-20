@@ -114,7 +114,10 @@ class RecordingSession:
         return cmd
 
     def start(self):
-        """Start recording. Returns the output file path."""
+        """Start recording. Returns the output file path.
+
+        Raises RuntimeError if ffmpeg fails to start (e.g. unsupported format).
+        """
         if self._process is not None:
             raise RuntimeError("Recording already in progress")
 
@@ -128,6 +131,21 @@ class RecordingSession:
             stderr=subprocess.PIPE,
             start_new_session=True,
         )
+
+        # Give ffmpeg a moment to start; check it didn't immediately crash
+        time.sleep(0.5)
+        if self._process.poll() is not None:
+            stderr = ""
+            try:
+                stderr = self._process.stderr.read().decode(errors="replace")
+            except Exception:
+                pass
+            self._process = None
+            self._output_path = None
+            raise RuntimeError(
+                f"ffmpeg failed to start recording.\n{stderr[-500:]}"
+            )
+
         self._start_time = time.time()
         atexit.register(self._atexit_cleanup)
         return self._output_path

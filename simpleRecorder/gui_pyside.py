@@ -367,7 +367,7 @@ class RecorderApp(QMainWindow):
             self.res_combo.setCurrentIndex(0)
             self.res_combo.blockSignals(False)
             self.fps_combo.clear()
-            self.fps_combo.addItems(["24", "30", "60"])
+            self.fps_combo.addItems(["24", "30"])
             self.fps_combo.setCurrentIndex(self.fps_combo.count() - 1)
 
         self.status_label.setText("Ready")
@@ -384,7 +384,7 @@ class RecorderApp(QMainWindow):
             self.fps_combo.addItems(fps_strs)
             self.fps_combo.setCurrentIndex(self.fps_combo.count() - 1)
         else:
-            self.fps_combo.addItems(["24", "30", "60"])
+            self.fps_combo.addItems(["24", "30"])
             self.fps_combo.setCurrentIndex(self.fps_combo.count() - 1)
 
     def _get_camera_index(self):
@@ -454,7 +454,13 @@ class RecorderApp(QMainWindow):
             base_name=self.name_edit.text(),
         )
 
-        path = self.session.start()
+        try:
+            path = self.session.start()
+        except RuntimeError as e:
+            self.session = None
+            self.status_label.setText(f"Record failed: {e}")
+            return
+
         self.recording = True
         self.clip_count += 1
         self.record_btn.setText("\u25a0 STOP")

@@ -280,7 +280,7 @@ class RecorderApp:
             self.fps_combo["values"] = fps_strs
             self.fps_combo.current(len(fps_strs) - 1)
         else:
-            self.fps_combo["values"] = ["24", "30", "60"]
+            self.fps_combo["values"] = ["24", "30"]
             self.fps_combo.current(len(self.fps_combo["values"]) - 1)
 
     def _get_camera_index(self):
@@ -351,7 +351,13 @@ class RecorderApp:
             base_name=self.name_var.get(),
         )
 
-        path = self.session.start()
+        try:
+            path = self.session.start()
+        except RuntimeError as e:
+            self.session = None
+            self.status_var.set(f"Record failed: {e}")
+            return
+
         self.recording = True
         self.clip_count += 1
         self.record_btn.config(text="■ STOP", bg="#333333", activebackground="#555555")

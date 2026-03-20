@@ -97,7 +97,7 @@ COLORMAP_OPTIONS = [
 ]
 
 FALLBACK_RESOLUTIONS = ["1920x1080", "1280x720", "640x480"]
-FALLBACK_FPS = ["24", "30", "60"]
+FALLBACK_FPS = ["24", "30"]
 
 
 class RecorderTUI(App):
@@ -584,7 +584,13 @@ class RecorderTUI(App):
             base_name=name_input.value,
         )
 
-        path = self._session.start()
+        try:
+            path = self._session.start()
+        except RuntimeError as e:
+            self._session = None
+            self._set_status(f"Record failed: {e}")
+            return
+
         self._recording = True
         self._clip_count += 1
 
