@@ -25,16 +25,23 @@ from recorder import RecordingSession, CODEC_MAP
 
 
 def _run_preview_process(cam, w, h, fps, codec, container, crf, output_dir,
-                         base_name, preroll, audio_device, overlay):
+                         base_name, preroll, audio_device,
+                         preview_tc, preview_meters, record_tc, record_meters):
     """Run preview in a separate process so OpenCV gets its own main thread."""
-    from preview import PreviewWindow
-    pw = PreviewWindow(
-        mode="regular", device_index=cam, width=w, height=h, fps=fps,
+    from pipeline import RecordingPipeline
+    pipe = RecordingPipeline(
+        device_index=cam, width=w, height=h, fps=fps,
         codec=codec, container=container, crf=crf,
         output_dir=output_dir, base_name=base_name,
-        pre_roll_seconds=preroll, audio_device=audio_device, overlay=overlay,
+        pre_roll_seconds=preroll, audio_device=audio_device,
+        preview_timecode=preview_tc, preview_meters=preview_meters,
+        record_timecode=record_tc, record_meters=record_meters,
     )
-    pw.run()
+    pipe.open()
+    try:
+        pipe.show_preview()
+    finally:
+        pipe.close()
 
 
 def _run_thermal_process(mode, device_index, colormap, output_dir, base_name,
@@ -149,13 +156,25 @@ class RecorderApp:
         self.name_var = tk.StringVar(value="recording")
         ttk.Entry(out_frame, textvariable=self.name_var, width=30).grid(row=1, column=1, sticky="ew", padx=4)
 
-        # Overlay checkbox
-        self.overlay_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(out_frame, text="Burn timecode", variable=self.overlay_var).grid(row=1, column=2, padx=4)
+        # --- Overlay Options ---
+        ovl_frame = ttk.LabelFrame(self.root, text="Overlays", padding=8)
+        ovl_frame.grid(row=3, column=0, sticky="ew", **pad)
+
+        ttk.Label(ovl_frame, text="Preview:").grid(row=0, column=0, sticky="w")
+        self.preview_tc_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(ovl_frame, text="Timecode", variable=self.preview_tc_var).grid(row=0, column=1, padx=4)
+        self.preview_meters_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(ovl_frame, text="Meters", variable=self.preview_meters_var).grid(row=0, column=2, padx=4)
+
+        ttk.Label(ovl_frame, text="Recording:").grid(row=1, column=0, sticky="w")
+        self.record_tc_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(ovl_frame, text="Timecode", variable=self.record_tc_var).grid(row=1, column=1, padx=4)
+        self.record_meters_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(ovl_frame, text="Meters", variable=self.record_meters_var).grid(row=1, column=2, padx=4)
 
         # --- Main Buttons ---
         btn_frame = ttk.Frame(self.root, padding=8)
-        btn_frame.grid(row=3, column=0, sticky="ew", **pad)
+        btn_frame.grid(row=4, column=0, sticky="ew", **pad)
 
         self.record_btn = tk.Button(
             btn_frame, text="● RECORD", font=("Helvetica", 14, "bold"),
@@ -184,7 +203,7 @@ class RecorderApp:
 
         # --- Thermal Options ---
         therm_frame = ttk.LabelFrame(self.root, text="Thermal Options", padding=8)
-        therm_frame.grid(row=4, column=0, sticky="ew", **pad)
+        therm_frame.grid(row=5, column=0, sticky="ew", **pad)
 
         ttk.Label(therm_frame, text="Backend:").grid(row=0, column=0, sticky="w")
         self.thermal_mode_var = tk.StringVar(value="infiray")
@@ -211,7 +230,7 @@ class RecorderApp:
         # --- Status ---
         self.status_var = tk.StringVar(value="Ready")
         ttk.Label(self.root, textvariable=self.status_var, anchor="w").grid(
-            row=5, column=0, sticky="ew", padx=8, pady=4,
+            row=6, column=0, sticky="ew", padx=8, pady=4,
         )
 
     # --- Device handling ---
@@ -398,7 +417,9 @@ class RecorderApp:
             args=(cam, w, h, fps, self.codec_var.get(),
                   self.container_var.get(), crf, self.dir_var.get(),
                   self.name_var.get(), preroll,
-                  self._get_audio_index(), self.overlay_var.get()),
+                  self._get_audio_index(),
+                  self.preview_tc_var.get(), self.preview_meters_var.get(),
+                  self.record_tc_var.get(), self.record_meters_var.get()),
             daemon=True,
         )
         p.start()

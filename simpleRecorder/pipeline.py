@@ -12,7 +12,9 @@ For thermal cameras, use the thermal-specific preview path in preview.py
 which handles colorization and radiometric recording.
 """
 
+import atexit
 import os
+import signal
 import subprocess
 import threading
 import time
@@ -102,7 +104,9 @@ class PipeEncoder:
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            start_new_session=True,
         )
+        atexit.register(self._atexit_cleanup)
 
     def write_frame(self, frame):
         """Write a BGR frame to the encoder."""
@@ -129,8 +133,38 @@ class PipeEncoder:
             try:
                 self._process.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                self._process.kill()
+                self._kill_process()
         self._process = None
+
+    def _kill_process(self):
+        """Kill the ffmpeg process and its process group."""
+        if self._process is None:
+            return
+        try:
+            os.killpg(os.getpgid(self._process.pid), signal.SIGKILL)
+        except (ProcessLookupError, OSError):
+            pass
+        try:
+            self._process.kill()
+        except OSError:
+            pass
+        try:
+            self._process.wait(timeout=2)
+        except Exception:
+            pass
+
+    def _atexit_cleanup(self):
+        """Safety net: kill ffmpeg on interpreter exit."""
+        if self._process is not None and self._process.poll() is None:
+            self._kill_process()
+            self._process = None
+
+    def __del__(self):
+        """Last-resort cleanup."""
+        try:
+            self._atexit_cleanup()
+        except Exception:
+            pass
 
 
 class RecordingPipeline:
@@ -165,6 +199,10 @@ class RecordingPipeline:
         overlay_position="bottom_left",
         overlay_label="",
         audio_device=None,
+        preview_timecode=True,
+        preview_meters=True,
+        record_timecode=False,
+        record_meters=False,
     ):
         self.device_index = device_index
         self.width = width
@@ -178,6 +216,12 @@ class RecordingPipeline:
         self.pre_roll_seconds = pre_roll_seconds
         self.audio_device = audio_device
 
+        # Overlay visibility flags
+        self.preview_timecode = preview_timecode if overlay else False
+        self.preview_meters = preview_meters
+        self.record_timecode = record_timecode
+        self.record_meters = record_meters
+
         self._grabber = None
         self._encoder = None
         self._recording = False
@@ -185,19 +229,30 @@ class RecordingPipeline:
         self._output_path = None
         self._clip_count = 0
 
-        # Overlay
+        # Overlay renderer (always created so it can be toggled)
         self._overlay = TimecodeOverlay(
             show_timestamp=True,
             show_timecode=True,
             label=overlay_label,
             position=overlay_position,
-        ) if overlay else None
+        )
 
         # Audio meter
         self._audio_meter = None
 
+    def _signal_cleanup(self, signum, frame):
+        """Handle SIGINT/SIGTERM: clean up and re-raise."""
+        self.close()
+        # Re-raise with default handler so the process exits properly
+        signal.signal(signum, signal.SIG_DFL)
+        os.kill(os.getpid(), signum)
+
     def open(self):
         """Open the camera and start capturing."""
+        # Register signal handlers to clean up ffmpeg on Ctrl+C
+        signal.signal(signal.SIGINT, self._signal_cleanup)
+        signal.signal(signal.SIGTERM, self._signal_cleanup)
+
         self._grabber = FrameGrabber(
             device_index=self.device_index,
             width=self.width,
@@ -293,8 +348,10 @@ class RecordingPipeline:
         """Listener: encode each frame as it's captured."""
         if self._recording and self._encoder is not None:
             out = frame.copy()
-            if self._overlay:
+            if self.record_timecode:
                 self._overlay.render(out)
+            if self.record_meters and self._audio_meter is not None:
+                draw_audio_meter(out, self._audio_meter)
             self._encoder.write_frame(out)
 
     @property
@@ -323,12 +380,11 @@ class RecordingPipeline:
         print(f"Pre-roll: {self.pre_roll_seconds}s buffer")
         if self.audio_device is not None:
             print(f"Audio meter: device {self.audio_device}")
-        print("Keys: Q=quit  R=record  SPACE=snapshot  O=toggle overlay")
+        print("Keys: Q=quit  R=record  SPACE=snapshot  T=toggle timecode  M=toggle meters")
 
         frame_count = 0
         fps_time = time.time()
         display_fps = 0.0
-        show_overlay = self._overlay is not None
 
         try:
             while True:
@@ -339,12 +395,12 @@ class RecordingPipeline:
 
                 display = frame.copy()
 
-                # Apply overlay to display (not to recording — that's in _on_frame)
-                if show_overlay and self._overlay:
+                # Apply overlays to preview display
+                if self.preview_timecode:
                     self._overlay.render(display)
 
-                # Audio meter
-                if self._audio_meter is not None:
+                # Audio meter on preview
+                if self.preview_meters and self._audio_meter is not None:
                     draw_audio_meter(display, self._audio_meter)
 
                 # FPS counter
@@ -381,9 +437,12 @@ class RecordingPipeline:
                     snap_path = os.path.join(self.output_dir, f"snapshot_{snap_ts}.png")
                     cv2.imwrite(snap_path, frame)
                     print(f"Snapshot: {snap_path}")
-                elif key in (ord('o'), ord('O')):
-                    show_overlay = not show_overlay
-                    print(f"Overlay: {'on' if show_overlay else 'off'}")
+                elif key in (ord('t'), ord('T')):
+                    self.preview_timecode = not self.preview_timecode
+                    print(f"Preview timecode: {'on' if self.preview_timecode else 'off'}")
+                elif key in (ord('m'), ord('M')):
+                    self.preview_meters = not self.preview_meters
+                    print(f"Preview meters: {'on' if self.preview_meters else 'off'}")
 
         finally:
             if self._recording:

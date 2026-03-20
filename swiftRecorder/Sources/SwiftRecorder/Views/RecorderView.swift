@@ -123,12 +123,9 @@ public struct RecorderView: View {
                     VStack(alignment: .leading) {
                         Text("Output Folder").font(.caption).foregroundColor(.secondary)
                         HStack {
-                            TextField("Path", text: Binding(
-                                get: { viewModel.outputDirectory.path },
-                                set: { viewModel.outputDirectory = URL(fileURLWithPath: $0) }
-                            ))
-                            .frame(width: 300)
-                            .textFieldStyle(.roundedBorder)
+                            TextField("Path", text: $viewModel.outputPath)
+                                .frame(width: 300)
+                                .textFieldStyle(.roundedBorder)
 
                             Button("Browse...") {
                                 let panel = NSOpenPanel()
@@ -137,7 +134,7 @@ public struct RecorderView: View {
                                 panel.allowsMultipleSelection = false
                                 panel.directoryURL = viewModel.outputDirectory
                                 if panel.runModal() == .OK, let url = panel.url {
-                                    viewModel.outputDirectory = url
+                                    viewModel.outputPath = url.path
                                 }
                             }
                         }

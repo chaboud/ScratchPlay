@@ -30,8 +30,12 @@ public final class RecorderViewModel: ObservableObject {
     @Published var selectedCodec: RecordingEngine.VideoCodec = .h264
     @Published var selectedContainer: RecordingEngine.Container = .mov
 
-    @Published var outputDirectory: URL = FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first!
+    @Published var outputPath: String = FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first!.path
     @Published var baseName: String = "recording"
+
+    var outputDirectory: URL {
+        URL(fileURLWithPath: outputPath)
+    }
 
     // MARK: - Objects
 

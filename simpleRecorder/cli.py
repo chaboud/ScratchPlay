@@ -55,16 +55,14 @@ def parse_args():
                        help="Open live preview window (use R key to record)")
     int_p.add_argument("--pre-roll", type=float, default=5.0,
                        help="Pre-roll buffer seconds (default 5, with --preview)")
-    int_p.add_argument("--no-overlay", action="store_true",
-                       help="Disable timecode overlay (with --preview)")
+    _add_overlay_args(int_p)
 
     # --- preview (unified pipeline: preview + record) ---
     prev_p = sub.add_parser("preview", help="Live preview window with recording")
     _add_recording_args(prev_p)
     prev_p.add_argument("--pre-roll", type=float, default=5.0,
                         help="Pre-roll buffer seconds (default 5)")
-    prev_p.add_argument("--no-overlay", action="store_true",
-                        help="Disable timecode overlay")
+    _add_overlay_args(prev_p)
 
     # --- thermal ---
     therm_p = sub.add_parser("thermal", help="Thermal camera preview + record")
@@ -116,6 +114,24 @@ def _add_recording_args(parser):
     parser.add_argument("--target", "-T", default=None,
                         help="Target output path (e.g. /tmp/myvideo.mov). "
                              "Overrides --output-dir, --base-name, --container")
+
+
+def _add_overlay_args(parser):
+    """Add overlay/burn arguments to preview-capable subparsers."""
+    parser.add_argument("--no-overlay", action="store_true",
+                        help="Disable timecode overlay on preview (legacy shorthand)")
+    parser.add_argument("--preview-timecode", action="store_true", default=True,
+                        help="Show timecode on preview (default: on)")
+    parser.add_argument("--no-preview-timecode", dest="preview_timecode", action="store_false",
+                        help="Hide timecode on preview")
+    parser.add_argument("--preview-meters", action="store_true", default=True,
+                        help="Show audio meters on preview (default: on)")
+    parser.add_argument("--no-preview-meters", dest="preview_meters", action="store_false",
+                        help="Hide audio meters on preview")
+    parser.add_argument("--record-timecode", action="store_true", default=False,
+                        help="Burn timecode into recorded video")
+    parser.add_argument("--record-meters", action="store_true", default=False,
+                        help="Burn audio meters into recorded video")
 
 
 def _resolve_target(args):
@@ -249,10 +265,20 @@ def cmd_interactive(args):
         print(f"\nInterrupted. {clip_count} clip(s) recorded.")
 
 
+def _resolve_overlay_flags(args):
+    """Resolve overlay flags, respecting legacy --no-overlay."""
+    preview_tc = args.preview_timecode and not args.no_overlay
+    preview_m = args.preview_meters
+    record_tc = args.record_timecode
+    record_m = args.record_meters
+    return preview_tc, preview_m, record_tc, record_m
+
+
 def _interactive_preview(args):
     """Interactive mode with live preview window via RecordingPipeline."""
     from pipeline import RecordingPipeline
 
+    p_tc, p_m, r_tc, r_m = _resolve_overlay_flags(args)
     pipe = RecordingPipeline(
         device_index=args.camera,
         width=args.width,
@@ -264,8 +290,11 @@ def _interactive_preview(args):
         output_dir=args.output_dir,
         base_name=args.base_name,
         pre_roll_seconds=args.pre_roll,
-        overlay=not args.no_overlay,
         audio_device=args.audio,
+        preview_timecode=p_tc,
+        preview_meters=p_m,
+        record_timecode=r_tc,
+        record_meters=r_m,
     )
     pipe.open()
     try:
@@ -279,8 +308,10 @@ def cmd_preview(args):
     from preview import PreviewWindow
 
     _resolve_defaults(args)
-    pw = PreviewWindow(
-        mode="regular",
+    from pipeline import RecordingPipeline
+
+    p_tc, p_m, r_tc, r_m = _resolve_overlay_flags(args)
+    pipe = RecordingPipeline(
         device_index=args.camera,
         width=args.width,
         height=args.height,
@@ -292,9 +323,16 @@ def cmd_preview(args):
         base_name=args.base_name,
         pre_roll_seconds=args.pre_roll,
         audio_device=args.audio,
-        overlay=not args.no_overlay,
+        preview_timecode=p_tc,
+        preview_meters=p_m,
+        record_timecode=r_tc,
+        record_meters=r_m,
     )
-    pw.run()
+    pipe.open()
+    try:
+        pipe.show_preview()
+    finally:
+        pipe.close()
 
 
 def cmd_thermal(args):
