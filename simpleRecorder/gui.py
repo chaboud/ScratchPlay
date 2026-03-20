@@ -425,8 +425,6 @@ class RecorderApp:
         self.status_var.set("Opening multi-cam preview...")
         self.root.update_idletasks()
 
-        indices = [idx for idx, name in self._devices["video"]]
-
         video_devices = list(self._devices["video"])
         p = multiprocessing.Process(
             target=_run_multicam_process,

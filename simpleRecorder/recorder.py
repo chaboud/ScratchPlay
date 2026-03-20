@@ -8,7 +8,6 @@ Supports:
 """
 
 import os
-import signal
 import subprocess
 import sys
 import time
@@ -214,7 +213,7 @@ def one_shot_record(
         print("\nRecording interrupted.")
         return output_path
 
-    session._process = None
-    session._start_time = None
+    # Clean up properly via stop() to close pipes and reset state
+    session.stop()
     print(f"Done. Saved: {output_path}")
     return output_path
