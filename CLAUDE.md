@@ -1,7 +1,7 @@
 # ScratchPlay
 
 ## Project Overview
-This is a collection of utility tools. Currently contains `simpleRecorder`, a Python-based video recorder for macOS.
+This is a collection of utility tools. Contains `simpleRecorder` (Python) and `swiftRecorder` (native Swift/macOS).
 
 ## simpleRecorder
 - **Location**: `simpleRecorder/`
@@ -56,3 +56,31 @@ python gui.py                                   # launch GUI
 - No external linter configured; keep it simple and readable
 - Use type hints where helpful but don't over-annotate
 - Minimal dependencies — ffmpeg does the heavy lifting, OpenCV for preview/thermal
+
+## swiftRecorder
+- **Location**: `swiftRecorder/`
+- **Language**: Swift 5.9+, SwiftUI, AVFoundation, VideoToolbox
+- **Build**: `swift build` (SPM), no Xcode project needed
+- **Platform**: macOS 13+ (Ventura)
+
+### Architecture
+- `Sources/SwiftRecorder/Camera/` — DeviceEnumerator, CaptureSession, AudioLevelMonitor
+- `Sources/SwiftRecorder/Recording/` — RecordingEngine (AVAssetWriter + VideoToolbox)
+- `Sources/SwiftRecorder/Views/` — SwiftUI views (preview, controls, VU meter)
+- `Sources/SwiftRecorderApp/` — SwiftUI app entry point
+- `Sources/SwiftRecorderCLI/` — Headless CLI for scripted recording
+
+### Running
+```bash
+cd swiftRecorder
+swift run swiftrecorder           # GUI app
+swift run swiftrecorder-cli devices       # list devices
+swift run swiftrecorder-cli record --duration 30  # headless recording
+```
+
+### Key Advantages over Python Version
+- Hardware-accelerated H.264/HEVC/ProRes encoding via VideoToolbox
+- GPU-composited preview (AVCaptureVideoPreviewLayer)
+- Framework-level A/V sync
+- Camera controls (exposure, focus, WB, ISO)
+- Lower power consumption for long sessions
