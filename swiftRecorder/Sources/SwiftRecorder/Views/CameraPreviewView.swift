@@ -33,6 +33,8 @@ private class PreviewNSView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    override var acceptsFirstResponder: Bool { false }
+
     override func layout() {
         super.layout()
         previewLayer.frame = bounds

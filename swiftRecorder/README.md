@@ -36,8 +36,8 @@ swift run swiftrecorder-cli record --duration 30
 
 ## Requirements
 
-- macOS 13+ (Ventura or later)
-- Xcode Command Line Tools or Xcode 15+
+- macOS 15+ (Sequoia)
+- Xcode Command Line Tools or Xcode 16+
 - Camera and microphone permissions (granted on first run)
 
 ## Architecture
