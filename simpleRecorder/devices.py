@@ -112,12 +112,40 @@ def get_unique_resolutions(formats):
 
 
 def get_fps_for_resolution(formats, width, height):
-    """Get all available FPS values for a given resolution."""
+    """Get all available FPS values for a given resolution, sorted ascending."""
     fps_set = set()
     for f in formats:
         if f["width"] == width and f["height"] == height:
             fps_set.update(f["fps_options"])
     return sorted(fps_set)
+
+
+def get_max_resolution(formats):
+    """Return the highest resolution (width, height) available, or None."""
+    resolutions = get_unique_resolutions(formats)
+    return resolutions[0] if resolutions else None
+
+
+def get_max_fps(formats, width, height):
+    """Return the highest FPS for a given resolution, or None."""
+    fps_list = get_fps_for_resolution(formats, width, height)
+    return fps_list[-1] if fps_list else None
+
+
+def get_best_defaults(video_index):
+    """Probe a camera and return (width, height, fps) at max resolution and max rate.
+
+    Returns (3840, 2160, 60) as fallback if probing yields nothing.
+    """
+    formats = probe_camera_formats(video_index)
+    res = get_max_resolution(formats)
+    if res is None:
+        return 3840, 2160, 60
+    w, h = res
+    fps = get_max_fps(formats, w, h)
+    if fps is None:
+        fps = 60
+    return w, h, fps
 
 
 def print_devices():

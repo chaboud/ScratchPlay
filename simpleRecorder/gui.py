@@ -157,15 +157,15 @@ class RecorderApp:
         if resolutions:
             res_items = [f"{w}x{h}" for w, h in resolutions]
             self.res_combo["values"] = res_items
-            self.res_combo.current(0)
+            self.res_combo.current(0)  # max resolution (sorted descending)
             self._on_resolution_changed()
         else:
-            # No formats reported — offer common defaults
+            # No formats reported — offer common defaults, max first
             defaults = ["3840x2160", "1920x1080", "1280x720", "640x480"]
             self.res_combo["values"] = defaults
-            self.res_combo.current(1)  # default to 1080p
-            self.fps_combo["values"] = ["60", "30", "24"]
-            self.fps_combo.current(1)
+            self.res_combo.current(0)  # default to 4K
+            self.fps_combo["values"] = ["24", "30", "60"]
+            self.fps_combo.current(len(self.fps_combo["values"]) - 1)  # max FPS
 
         self.status_var.set("Ready")
 
@@ -177,11 +177,12 @@ class RecorderApp:
         w, h = (int(x) for x in res.split("x"))
         fps_list = get_fps_for_resolution(self._formats, w, h)
         if fps_list:
-            self.fps_combo["values"] = [str(int(f)) if f == int(f) else str(f) for f in fps_list]
-            self.fps_combo.current(0)
+            fps_strs = [str(int(f)) if f == int(f) else str(f) for f in fps_list]
+            self.fps_combo["values"] = fps_strs
+            self.fps_combo.current(len(fps_strs) - 1)  # max FPS
         else:
-            self.fps_combo["values"] = ["60", "30", "24"]
-            self.fps_combo.current(1)
+            self.fps_combo["values"] = ["24", "30", "60"]
+            self.fps_combo.current(len(self.fps_combo["values"]) - 1)  # max FPS
 
     def _get_camera_index(self):
         val = self.camera_var.get()

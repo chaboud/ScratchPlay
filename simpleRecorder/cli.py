@@ -16,7 +16,10 @@ import termios
 import tty
 import time
 
-from devices import list_avfoundation_devices, print_devices, print_camera_formats
+from devices import (
+    list_avfoundation_devices, print_devices, print_camera_formats,
+    get_best_defaults,
+)
 from recorder import RecordingSession, one_shot_record
 
 
@@ -54,9 +57,9 @@ def _add_recording_args(parser):
     """Add common recording arguments to a subparser."""
     parser.add_argument("--camera", "-c", type=int, default=0, help="Video device index")
     parser.add_argument("--audio", "-a", type=int, default=None, help="Audio device index (omit for no audio)")
-    parser.add_argument("--width", "-W", type=int, default=1920, help="Video width")
-    parser.add_argument("--height", "-H", type=int, default=1080, help="Video height")
-    parser.add_argument("--fps", "-f", type=int, default=30, help="Frame rate")
+    parser.add_argument("--width", "-W", type=int, default=None, help="Video width (default: max for camera)")
+    parser.add_argument("--height", "-H", type=int, default=None, help="Video height (default: max for camera)")
+    parser.add_argument("--fps", "-f", type=int, default=None, help="Frame rate (default: max for resolution)")
     parser.add_argument("--codec", choices=["h264", "avc", "h265", "hevc"], default="h264")
     parser.add_argument("--container", choices=["mov", "mp4"], default="mov")
     parser.add_argument("--crf", type=int, default=None, help="Quality (lower=better, default 20 for h264)")
@@ -64,8 +67,23 @@ def _add_recording_args(parser):
     parser.add_argument("--base-name", "-n", default="recording", help="Base filename")
 
 
+def _resolve_defaults(args):
+    """Fill in width/height/fps from camera probe if not explicitly set."""
+    if args.width is None or args.height is None or args.fps is None:
+        print(f"Probing camera {args.camera} for best defaults...")
+        w, h, fps = get_best_defaults(args.camera)
+        if args.width is None:
+            args.width = w
+        if args.height is None:
+            args.height = h
+        if args.fps is None:
+            args.fps = fps
+        print(f"  Using {args.width}x{args.height}@{args.fps}")
+
+
 def cmd_record(args):
     """One-shot recording."""
+    _resolve_defaults(args)
     one_shot_record(
         video_device=args.camera,
         audio_device=args.audio,
@@ -98,6 +116,7 @@ def _getch_nonblocking(timeout=0.1):
 
 def cmd_interactive(args):
     """Interactive mode: spacebar toggles recording on/off."""
+    _resolve_defaults(args)
     session = RecordingSession(
         video_device=args.camera,
         audio_device=args.audio,
