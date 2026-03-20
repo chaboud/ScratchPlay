@@ -2,13 +2,14 @@
 """Command-line interface for simpleRecorder.
 
 Usage modes:
-  1. One-shot:    python cli.py record --duration 30
-  2. Interactive: python cli.py interactive  (spacebar to start/stop clips)
-  3. Preview:     python cli.py preview  (live view window, R to record)
-  4. Thermal:     python cli.py thermal --mode infiray  (thermal preview)
-  5. List:        python cli.py devices
-  6. Formats:     python cli.py formats --camera 0
-  7. Scan:        python cli.py thermal-scan  (detect thermal cameras)
+  python cli.py devices               List cameras and audio devices
+  python cli.py formats -c 0          Show camera formats
+  python cli.py record -t 30          One-shot recording
+  python cli.py interactive           Spacebar start/stop clips
+  python cli.py preview -c 0          Live preview with record (R key)
+  python cli.py thermal -m infiray    Thermal camera preview
+  python cli.py thermal-scan          Detect thermal cameras
+  python cli.py multicam              Multi-camera simultaneous recording
 """
 
 import argparse
@@ -38,55 +39,74 @@ def parse_args():
 
     # --- formats ---
     fmt_p = sub.add_parser("formats", help="Show supported formats for a camera")
-    fmt_p.add_argument("--camera", "-c", type=int, default=0, help="Video device index")
+    fmt_p.add_argument("--camera", "-c", type=int, default=0)
 
-    # --- record (one-shot) ---
-    rec_p = sub.add_parser("record", help="Record a single clip")
+    # --- record (one-shot via ffmpeg) ---
+    rec_p = sub.add_parser("record", help="Record a single clip (ffmpeg direct)")
     _add_recording_args(rec_p)
-    rec_p.add_argument("--duration", "-t", type=float, default=10, help="Duration in seconds")
+    rec_p.add_argument("--duration", "-t", type=float, default=10)
 
-    # --- interactive (spacebar toggle) ---
+    # --- interactive (spacebar toggle, ffmpeg direct) ---
     int_p = sub.add_parser("interactive", help="Spacebar to start/stop recording clips")
     _add_recording_args(int_p)
-    int_p.add_argument(
-        "--max-length", type=float, default=None,
-        help="Max clip length in seconds (auto-stop and start new file)",
-    )
+    int_p.add_argument("--max-length", type=float, default=None,
+                       help="Max clip length in seconds")
 
-    # --- preview (live view window) ---
-    prev_p = sub.add_parser("preview", help="Live preview window (regular camera)")
-    prev_p.add_argument("--camera", "-c", type=int, default=0, help="Video device index")
-    prev_p.add_argument("--width", "-W", type=int, default=None, help="Video width")
-    prev_p.add_argument("--height", "-H", type=int, default=None, help="Video height")
-    prev_p.add_argument("--fps", "-f", type=int, default=None, help="Frame rate")
+    # --- preview (unified pipeline: preview + record) ---
+    prev_p = sub.add_parser("preview", help="Live preview window with recording")
+    _add_recording_args(prev_p)
+    prev_p.add_argument("--pre-roll", type=float, default=5.0,
+                        help="Pre-roll buffer seconds (default 5)")
+    prev_p.add_argument("--no-overlay", action="store_true",
+                        help="Disable timecode overlay")
 
-    # --- thermal (thermal camera preview + record) ---
-    therm_p = sub.add_parser("thermal", help="Thermal camera preview")
-    therm_p.add_argument("--mode", "-m", choices=["infiray", "waveshare"], default="infiray",
-                         help="Thermal camera backend")
-    therm_p.add_argument("--camera", "-c", type=int, default=0, help="Video device index (infiray)")
+    # --- thermal ---
+    therm_p = sub.add_parser("thermal", help="Thermal camera preview + record")
+    therm_p.add_argument("--mode", "-m", choices=["infiray", "waveshare"], default="infiray")
+    therm_p.add_argument("--camera", "-c", type=int, default=0)
+    therm_p.add_argument("--audio", "-a", type=int, default=None)
     therm_p.add_argument("--colormap", default="inferno",
-                         help="Colormap: inferno, jet, hot, turbo, magma, rainbow, white_hot, black_hot")
-    therm_p.add_argument("--waveshare-fps", type=int, default=15, help="Waveshare sensor FPS")
+                         help="inferno, jet, hot, turbo, magma, rainbow, white_hot, black_hot")
+    therm_p.add_argument("--waveshare-fps", type=int, default=15)
+    therm_p.add_argument("--range-min", type=float, default=None,
+                         help="Lock colormap min temperature (C)")
+    therm_p.add_argument("--range-max", type=float, default=None,
+                         help="Lock colormap max temperature (C)")
+    therm_p.add_argument("--output-dir", "-o", default=".")
+    therm_p.add_argument("--base-name", "-n", default="thermal")
 
     # --- thermal-scan ---
     sub.add_parser("thermal-scan", help="Auto-detect connected thermal cameras")
+
+    # --- multicam ---
+    mc_p = sub.add_parser("multicam", help="Multi-camera simultaneous recording")
+    mc_p.add_argument("--cameras", type=str, required=True,
+                      help="Comma-separated device indices (e.g. 0,1,2)")
+    mc_p.add_argument("--names", type=str, default=None,
+                      help="Comma-separated names (e.g. front,side,top)")
+    mc_p.add_argument("--output-dir", "-o", default=".")
+    mc_p.add_argument("--base-name", "-n", default="multicam")
 
     return p.parse_args()
 
 
 def _add_recording_args(parser):
     """Add common recording arguments to a subparser."""
-    parser.add_argument("--camera", "-c", type=int, default=0, help="Video device index")
-    parser.add_argument("--audio", "-a", type=int, default=None, help="Audio device index (omit for no audio)")
-    parser.add_argument("--width", "-W", type=int, default=None, help="Video width (default: max for camera)")
-    parser.add_argument("--height", "-H", type=int, default=None, help="Video height (default: max for camera)")
-    parser.add_argument("--fps", "-f", type=int, default=None, help="Frame rate (default: max for resolution)")
+    parser.add_argument("--camera", "-c", type=int, default=0)
+    parser.add_argument("--audio", "-a", type=int, default=None,
+                        help="Audio device index (omit for no audio)")
+    parser.add_argument("--width", "-W", type=int, default=None,
+                        help="Video width (default: max)")
+    parser.add_argument("--height", "-H", type=int, default=None,
+                        help="Video height (default: max)")
+    parser.add_argument("--fps", "-f", type=int, default=None,
+                        help="Frame rate (default: max)")
     parser.add_argument("--codec", choices=["h264", "avc", "h265", "hevc"], default="h264")
     parser.add_argument("--container", choices=["mov", "mp4"], default="mov")
-    parser.add_argument("--crf", type=int, default=None, help="Quality (lower=better, default 20 for h264)")
-    parser.add_argument("--output-dir", "-o", default=".", help="Output directory")
-    parser.add_argument("--base-name", "-n", default="recording", help="Base filename")
+    parser.add_argument("--crf", type=int, default=None,
+                        help="Quality (lower=better, default 20)")
+    parser.add_argument("--output-dir", "-o", default=".")
+    parser.add_argument("--base-name", "-n", default="recording")
 
 
 def _resolve_defaults(args):
@@ -104,7 +124,6 @@ def _resolve_defaults(args):
 
 
 def cmd_record(args):
-    """One-shot recording."""
     _resolve_defaults(args)
     one_shot_record(
         video_device=args.camera,
@@ -122,22 +141,19 @@ def cmd_record(args):
 
 
 def _getch_nonblocking(timeout=0.1):
-    """Read a single keypress without blocking, with timeout. Returns None if no key."""
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
     try:
         tty.setraw(fd)
         ready, _, _ = select.select([sys.stdin], [], [], timeout)
         if ready:
-            ch = sys.stdin.read(1)
-            return ch
+            return sys.stdin.read(1)
         return None
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
 def cmd_interactive(args):
-    """Interactive mode: spacebar toggles recording on/off."""
     _resolve_defaults(args)
     session = RecordingSession(
         video_device=args.camera,
@@ -165,37 +181,32 @@ def cmd_interactive(args):
     print("-" * 40)
 
     recording = False
-
     try:
         while True:
             ch = _getch_nonblocking(0.2)
 
             if ch == " ":
                 if not recording:
-                    # Start new clip
                     path = session.start()
                     recording = True
                     clip_count += 1
                     print(f"\n● REC #{clip_count}: {os.path.basename(path)}")
                 else:
-                    # Stop current clip
                     path, dur = session.stop()
                     recording = False
                     print(f"\n■ STOP: {os.path.basename(path)} ({dur:.1f}s)")
-            elif ch in ("q", "Q", "\x03"):  # q or Ctrl-C
+            elif ch in ("q", "Q", "\x03"):
                 if recording:
                     path, dur = session.stop()
                     print(f"\n■ STOP: {os.path.basename(path)} ({dur:.1f}s)")
                 print(f"\nDone. {clip_count} clip(s) recorded.")
                 break
 
-            # Auto-stop if max duration reached
             if recording and args.max_length and session.elapsed >= args.max_length:
                 path, dur = session.stop()
                 print(f"\n■ AUTO-STOP (max length): {os.path.basename(path)} ({dur:.1f}s)")
                 recording = False
 
-            # Status line
             if recording:
                 elapsed = session.elapsed
                 sys.stdout.write(f"\r  ● {elapsed:.0f}s elapsed...  ")
@@ -209,7 +220,7 @@ def cmd_interactive(args):
 
 
 def cmd_preview(args):
-    """Live preview window for a regular camera."""
+    """Live preview with unified pipeline (preview-while-record + pre-roll)."""
     from preview import PreviewWindow
 
     _resolve_defaults(args)
@@ -219,32 +230,47 @@ def cmd_preview(args):
         width=args.width,
         height=args.height,
         fps=args.fps,
+        codec=args.codec,
+        container=args.container,
+        crf=args.crf if args.crf else 20,
+        output_dir=args.output_dir,
+        base_name=args.base_name,
+        pre_roll_seconds=args.pre_roll,
+        audio_device=args.audio,
+        overlay=not args.no_overlay,
     )
     pw.run()
 
 
 def cmd_thermal(args):
-    """Thermal camera preview window."""
+    """Thermal camera preview with radiometric recording."""
     from preview import PreviewWindow
+
+    range_lock = None
+    if args.range_min is not None and args.range_max is not None:
+        range_lock = (args.range_min, args.range_max)
 
     pw = PreviewWindow(
         mode=args.mode,
         device_index=args.camera,
         colormap=args.colormap,
         waveshare_fps=args.waveshare_fps,
+        output_dir=args.output_dir,
+        base_name=args.base_name,
+        range_lock=range_lock,
+        audio_device=args.audio,
     )
     pw.run()
 
 
 def cmd_thermal_scan():
-    """Detect and list connected thermal cameras."""
     from thermal import detect_thermal_cameras
 
     print("Scanning for thermal cameras...")
     cameras = detect_thermal_cameras()
     if not cameras:
         print("  No thermal cameras detected.")
-        print("  (Make sure the camera is plugged in and not claimed by another app)")
+        print("  (Make sure camera is plugged in and not claimed by another app)")
     else:
         for cam in cameras:
             idx = cam["device_index"]
@@ -252,27 +278,52 @@ def cmd_thermal_scan():
             print(f"  [{cam['type']}] {cam['name']} ({idx_str})")
 
 
+def cmd_multicam(args):
+    """Multi-camera simultaneous recording with composite preview."""
+    from multicam import MultiCamSession, CameraConfig
+
+    indices = [int(x.strip()) for x in args.cameras.split(",")]
+    names = None
+    if args.names:
+        names = [n.strip() for n in args.names.split(",")]
+
+    session = MultiCamSession(output_dir=args.output_dir, base_name=args.base_name)
+
+    for i, idx in enumerate(indices):
+        name = names[i] if names and i < len(names) else f"cam{idx}"
+        session.add_camera(CameraConfig(device_index=idx, name=name))
+
+    print(f"Opening {len(indices)} camera(s)...")
+    session.open_all()
+
+    try:
+        session.show_preview()
+    finally:
+        if session.is_recording:
+            session.stop_all()
+        session.close_all()
+
+
 def main():
     args = parse_args()
 
+    commands = {
+        "devices": lambda: print_devices(),
+        "formats": lambda: print_camera_formats(args.camera),
+        "record": lambda: cmd_record(args),
+        "interactive": lambda: cmd_interactive(args),
+        "preview": lambda: cmd_preview(args),
+        "thermal": lambda: cmd_thermal(args),
+        "thermal-scan": lambda: cmd_thermal_scan(),
+        "multicam": lambda: cmd_multicam(args),
+    }
+
     if args.command is None:
-        print("Usage: python cli.py {devices|formats|record|interactive|preview|thermal|thermal-scan}")
+        print("Usage: python cli.py {" + "|".join(commands.keys()) + "}")
         print("Run with -h for help.")
         sys.exit(1)
-    elif args.command == "devices":
-        print_devices()
-    elif args.command == "formats":
-        print_camera_formats(args.camera)
-    elif args.command == "record":
-        cmd_record(args)
-    elif args.command == "interactive":
-        cmd_interactive(args)
-    elif args.command == "preview":
-        cmd_preview(args)
-    elif args.command == "thermal":
-        cmd_thermal(args)
-    elif args.command == "thermal-scan":
-        cmd_thermal_scan()
+
+    commands[args.command]()
 
 
 if __name__ == "__main__":

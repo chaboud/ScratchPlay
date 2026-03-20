@@ -11,7 +11,18 @@ Both backends produce a unified ThermalFrame with:
   - raw_temps: 2D numpy array of temperatures in Celsius
   - colorized: BGR image with applied colormap
   - min/max temp and their locations
+
+Features:
+  - Temperature range lock for consistent colormap visualization
+  - Radiometric sidecar export (CSV + binary) alongside video recordings
 """
+
+import csv
+import io
+import os
+import struct
+import time
+from datetime import datetime
 
 import numpy as np
 
@@ -63,23 +74,32 @@ class ThermalFrame:
         self.height, self.width = raw_temps.shape[:2]
 
 
-def _normalize_and_colorize(temps, colormap_name):
+def _normalize_and_colorize(temps, colormap_name, range_lock=None):
     """Normalize temperature array to 0-255 and apply colormap.
 
     Args:
         temps: 2D numpy array of float temperatures (Celsius).
         colormap_name: Key from COLORMAPS dict.
+        range_lock: Optional (min_c, max_c) tuple to lock the temperature
+                    range for consistent visualization. Values outside the
+                    range are clamped.
 
     Returns:
         BGR image (uint8).
     """
-    t_min = temps.min()
-    t_max = temps.max()
+    if range_lock is not None:
+        t_min, t_max = range_lock
+        clamped = np.clip(temps, t_min, t_max)
+    else:
+        t_min = temps.min()
+        t_max = temps.max()
+        clamped = temps
+
     t_range = t_max - t_min
     if t_range < 0.01:
         t_range = 1.0  # avoid division by zero on uniform image
 
-    normalized = ((temps - t_min) / t_range * 255).astype(np.uint8)
+    normalized = ((clamped - t_min) / t_range * 255).astype(np.uint8)
 
     if colormap_name == "white_hot":
         return cv2.cvtColor(normalized, cv2.COLOR_GRAY2BGR)
@@ -119,12 +139,13 @@ class InfiRayCamera:
     Temperature formula: temp_C = (hi_byte * 256 + lo_byte) / 64 - 273.15
     """
 
-    def __init__(self, device_index=0, colormap=DEFAULT_COLORMAP):
+    def __init__(self, device_index=0, colormap=DEFAULT_COLORMAP, range_lock=None):
         if not HAS_CV2:
             raise RuntimeError("opencv-python is required for InfiRay cameras")
 
         self.device_index = device_index
         self.colormap = colormap
+        self.range_lock = range_lock  # (min_c, max_c) or None for auto-scale
         self._cap = None
         self._sensor_height = None  # detected on first frame
 
@@ -168,7 +189,7 @@ class InfiRayCamera:
         raw_temps = self._extract_temperatures(thdata)
 
         min_val, max_val, min_loc, max_loc = _find_extremes(raw_temps)
-        colorized = _normalize_and_colorize(raw_temps, self.colormap)
+        colorized = _normalize_and_colorize(raw_temps, self.colormap, self.range_lock)
 
         return ThermalFrame(raw_temps, colorized, min_val, max_val, min_loc, max_loc)
 
@@ -242,7 +263,7 @@ class WaveshareCamera:
     Typical sensors: 80x62 or 160x120 pixels.
     """
 
-    def __init__(self, colormap=DEFAULT_COLORMAP, fps=15):
+    def __init__(self, colormap=DEFAULT_COLORMAP, fps=15, range_lock=None):
         if not HAS_SENXOR:
             raise RuntimeError(
                 "senxor library is required for Waveshare cameras. "
@@ -250,6 +271,7 @@ class WaveshareCamera:
             )
         self.colormap = colormap
         self.fps = fps
+        self.range_lock = range_lock  # (min_c, max_c) or None for auto-scale
         self._mi48 = None
         self._with_header = True
 
@@ -290,7 +312,7 @@ class WaveshareCamera:
 
         temps = temps.astype(np.float64)
         min_val, max_val, min_loc, max_loc = _find_extremes(temps)
-        colorized = _normalize_and_colorize(temps, self.colormap)
+        colorized = _normalize_and_colorize(temps, self.colormap, self.range_lock)
 
         return ThermalFrame(temps, colorized, min_val, max_val, min_loc, max_loc)
 
@@ -354,6 +376,129 @@ def draw_temp_overlay(image, frame, scale=1.0):
                 (200, 200, 200), max(1, thickness - 1))
 
     return image
+
+
+# ---------------------------------------------------------------------------
+# Radiometric sidecar recorder
+# ---------------------------------------------------------------------------
+
+class RadiometricRecorder:
+    """Records per-frame radiometric data alongside video.
+
+    Produces two sidecar files next to the video:
+      - .thermal.csv  — per-frame summary (timestamp, min, max, mean, center temp)
+      - .thermal.bin  — raw temperature arrays (float32) for every frame,
+                        suitable for post-processing with numpy
+
+    Binary format:
+      Header: 12 bytes — uint32 width, uint32 height, float32 fps
+      Per frame: width*height float32 values (little-endian)
+
+    Usage:
+        rec = RadiometricRecorder("recording_20240115_143022.mov")
+        rec.open(width=256, height=192, fps=15)
+        for each frame:
+            rec.write_frame(thermal_frame)
+        rec.close()
+    """
+
+    def __init__(self, video_path):
+        base = video_path.rsplit(".", 1)[0]
+        self._csv_path = base + ".thermal.csv"
+        self._bin_path = base + ".thermal.bin"
+        self._csv_file = None
+        self._csv_writer = None
+        self._bin_file = None
+        self._frame_num = 0
+        self._start_time = None
+
+    @property
+    def csv_path(self):
+        return self._csv_path
+
+    @property
+    def bin_path(self):
+        return self._bin_path
+
+    def open(self, width, height, fps):
+        """Open sidecar files and write headers."""
+        self._csv_file = open(self._csv_path, "w", newline="")
+        self._csv_writer = csv.writer(self._csv_file)
+        self._csv_writer.writerow([
+            "frame", "timestamp", "elapsed_s",
+            "min_temp_c", "max_temp_c", "mean_temp_c", "center_temp_c",
+            "min_x", "min_y", "max_x", "max_y",
+        ])
+
+        self._bin_file = open(self._bin_path, "wb")
+        # Header: width, height, fps
+        self._bin_file.write(struct.pack("<IIf", width, height, fps))
+
+        self._frame_num = 0
+        self._start_time = time.time()
+
+    def write_frame(self, thermal_frame):
+        """Record one frame's radiometric data."""
+        if self._csv_writer is None:
+            return
+
+        self._frame_num += 1
+        now = time.time()
+        elapsed = now - self._start_time if self._start_time else 0
+
+        cy, cx = thermal_frame.height // 2, thermal_frame.width // 2
+        center_temp = float(thermal_frame.raw_temps[cy, cx])
+
+        self._csv_writer.writerow([
+            self._frame_num,
+            f"{now:.3f}",
+            f"{elapsed:.3f}",
+            f"{thermal_frame.min_temp:.2f}",
+            f"{thermal_frame.max_temp:.2f}",
+            f"{float(thermal_frame.raw_temps.mean()):.2f}",
+            f"{center_temp:.2f}",
+            thermal_frame.min_loc[0], thermal_frame.min_loc[1],
+            thermal_frame.max_loc[0], thermal_frame.max_loc[1],
+        ])
+
+        # Write raw float32 array to binary file
+        if self._bin_file is not None:
+            self._bin_file.write(
+                thermal_frame.raw_temps.astype(np.float32).tobytes()
+            )
+
+    def close(self):
+        """Flush and close sidecar files."""
+        if self._csv_file is not None:
+            self._csv_file.close()
+            self._csv_file = None
+            self._csv_writer = None
+        if self._bin_file is not None:
+            self._bin_file.close()
+            self._bin_file = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+
+def load_radiometric_bin(path):
+    """Load a .thermal.bin file back into numpy arrays.
+
+    Returns (width, height, fps, frames) where frames is a 3D array
+    of shape (num_frames, height, width) with float32 temperatures.
+    """
+    with open(path, "rb") as f:
+        header = f.read(12)
+        width, height, fps = struct.unpack("<IIf", header)
+        data = np.frombuffer(f.read(), dtype=np.float32)
+
+    pixels_per_frame = width * height
+    num_frames = len(data) // pixels_per_frame
+    frames = data[:num_frames * pixels_per_frame].reshape((num_frames, height, width))
+    return width, height, fps, frames
 
 
 # ---------------------------------------------------------------------------
