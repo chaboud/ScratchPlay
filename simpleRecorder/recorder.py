@@ -156,6 +156,14 @@ class RecordingSession:
         duration = time.time() - self._start_time if self._start_time else 0
         path = self._output_path
 
+        # Close pipes before dropping the process to avoid BrokenPipeError
+        for pipe in (self._process.stdin, self._process.stdout, self._process.stderr):
+            if pipe:
+                try:
+                    pipe.close()
+                except (BrokenPipeError, OSError):
+                    pass
+
         self._process = None
         self._output_path = None
         self._start_time = None
