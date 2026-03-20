@@ -4,8 +4,11 @@
 Usage modes:
   1. One-shot:    python cli.py record --duration 30
   2. Interactive: python cli.py interactive  (spacebar to start/stop clips)
-  3. List:        python cli.py devices
-  4. Formats:     python cli.py formats --camera 0
+  3. Preview:     python cli.py preview  (live view window, R to record)
+  4. Thermal:     python cli.py thermal --mode infiray  (thermal preview)
+  5. List:        python cli.py devices
+  6. Formats:     python cli.py formats --camera 0
+  7. Scan:        python cli.py thermal-scan  (detect thermal cameras)
 """
 
 import argparse
@@ -49,6 +52,25 @@ def parse_args():
         "--max-length", type=float, default=None,
         help="Max clip length in seconds (auto-stop and start new file)",
     )
+
+    # --- preview (live view window) ---
+    prev_p = sub.add_parser("preview", help="Live preview window (regular camera)")
+    prev_p.add_argument("--camera", "-c", type=int, default=0, help="Video device index")
+    prev_p.add_argument("--width", "-W", type=int, default=None, help="Video width")
+    prev_p.add_argument("--height", "-H", type=int, default=None, help="Video height")
+    prev_p.add_argument("--fps", "-f", type=int, default=None, help="Frame rate")
+
+    # --- thermal (thermal camera preview + record) ---
+    therm_p = sub.add_parser("thermal", help="Thermal camera preview")
+    therm_p.add_argument("--mode", "-m", choices=["infiray", "waveshare"], default="infiray",
+                         help="Thermal camera backend")
+    therm_p.add_argument("--camera", "-c", type=int, default=0, help="Video device index (infiray)")
+    therm_p.add_argument("--colormap", default="inferno",
+                         help="Colormap: inferno, jet, hot, turbo, magma, rainbow, white_hot, black_hot")
+    therm_p.add_argument("--waveshare-fps", type=int, default=15, help="Waveshare sensor FPS")
+
+    # --- thermal-scan ---
+    sub.add_parser("thermal-scan", help="Auto-detect connected thermal cameras")
 
     return p.parse_args()
 
@@ -186,11 +208,55 @@ def cmd_interactive(args):
         print(f"\nInterrupted. {clip_count} clip(s) recorded.")
 
 
+def cmd_preview(args):
+    """Live preview window for a regular camera."""
+    from preview import PreviewWindow
+
+    _resolve_defaults(args)
+    pw = PreviewWindow(
+        mode="regular",
+        device_index=args.camera,
+        width=args.width,
+        height=args.height,
+        fps=args.fps,
+    )
+    pw.run()
+
+
+def cmd_thermal(args):
+    """Thermal camera preview window."""
+    from preview import PreviewWindow
+
+    pw = PreviewWindow(
+        mode=args.mode,
+        device_index=args.camera,
+        colormap=args.colormap,
+        waveshare_fps=args.waveshare_fps,
+    )
+    pw.run()
+
+
+def cmd_thermal_scan():
+    """Detect and list connected thermal cameras."""
+    from thermal import detect_thermal_cameras
+
+    print("Scanning for thermal cameras...")
+    cameras = detect_thermal_cameras()
+    if not cameras:
+        print("  No thermal cameras detected.")
+        print("  (Make sure the camera is plugged in and not claimed by another app)")
+    else:
+        for cam in cameras:
+            idx = cam["device_index"]
+            idx_str = f"device {idx}" if idx is not None else "serial"
+            print(f"  [{cam['type']}] {cam['name']} ({idx_str})")
+
+
 def main():
     args = parse_args()
 
     if args.command is None:
-        print("Usage: python cli.py {devices|formats|record|interactive}")
+        print("Usage: python cli.py {devices|formats|record|interactive|preview|thermal|thermal-scan}")
         print("Run with -h for help.")
         sys.exit(1)
     elif args.command == "devices":
@@ -201,6 +267,12 @@ def main():
         cmd_record(args)
     elif args.command == "interactive":
         cmd_interactive(args)
+    elif args.command == "preview":
+        cmd_preview(args)
+    elif args.command == "thermal":
+        cmd_thermal(args)
+    elif args.command == "thermal-scan":
+        cmd_thermal_scan()
 
 
 if __name__ == "__main__":

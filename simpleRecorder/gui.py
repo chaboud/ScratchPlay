@@ -3,7 +3,7 @@
 
 Provides dropdown selectors for camera, audio, resolution, frame rate,
 codec, container, and quality. Record button toggles recording on/off.
-Configurable output directory and base filename.
+Preview button opens a live view window. Thermal mode support.
 """
 
 import os
@@ -52,7 +52,9 @@ class RecorderApp:
         self.audio_combo = ttk.Combobox(dev_frame, textvariable=self.audio_var, state="readonly", width=35)
         self.audio_combo.grid(row=1, column=1, sticky="ew", padx=4)
 
-        ttk.Button(dev_frame, text="Refresh", command=self._refresh_devices).grid(row=0, column=2, padx=4)
+        btn_col = ttk.Frame(dev_frame)
+        btn_col.grid(row=0, column=2, rowspan=2, padx=4)
+        ttk.Button(btn_col, text="Refresh", command=self._refresh_devices).pack(pady=1)
 
         # --- Format Selection ---
         fmt_frame = ttk.LabelFrame(self.root, text="Format", padding=8)
@@ -104,21 +106,55 @@ class RecorderApp:
         self.name_var = tk.StringVar(value="recording")
         ttk.Entry(out_frame, textvariable=self.name_var, width=30).grid(row=1, column=1, sticky="ew", padx=4)
 
-        # --- Record Button ---
+        # --- Buttons ---
         btn_frame = ttk.Frame(self.root, padding=8)
         btn_frame.grid(row=3, column=0, sticky="ew", **pad)
 
         self.record_btn = tk.Button(
             btn_frame, text="● RECORD", font=("Helvetica", 16, "bold"),
             fg="white", bg="#cc0000", activebackground="#ff3333",
-            width=20, height=2, command=self._toggle_record,
+            width=14, height=2, command=self._toggle_record,
         )
-        self.record_btn.pack()
+        self.record_btn.pack(side="left", padx=(0, 8))
+
+        self.preview_btn = tk.Button(
+            btn_frame, text="PREVIEW", font=("Helvetica", 14, "bold"),
+            fg="white", bg="#336699", activebackground="#4488bb",
+            width=10, height=2, command=self._open_preview,
+        )
+        self.preview_btn.pack(side="left", padx=(0, 8))
+
+        self.thermal_btn = tk.Button(
+            btn_frame, text="THERMAL", font=("Helvetica", 14, "bold"),
+            fg="white", bg="#cc6600", activebackground="#ee8833",
+            width=10, height=2, command=self._open_thermal,
+        )
+        self.thermal_btn.pack(side="left")
+
+        # --- Thermal Options (collapsed by default) ---
+        therm_frame = ttk.LabelFrame(self.root, text="Thermal Options", padding=8)
+        therm_frame.grid(row=4, column=0, sticky="ew", **pad)
+
+        ttk.Label(therm_frame, text="Backend:").grid(row=0, column=0, sticky="w")
+        self.thermal_mode_var = tk.StringVar(value="infiray")
+        ttk.Combobox(
+            therm_frame, textvariable=self.thermal_mode_var,
+            values=["infiray", "waveshare"], state="readonly", width=12,
+        ).grid(row=0, column=1, sticky="w", padx=4)
+
+        ttk.Label(therm_frame, text="Colormap:").grid(row=0, column=2, sticky="w", padx=(12, 0))
+        self.colormap_var = tk.StringVar(value="inferno")
+        ttk.Combobox(
+            therm_frame, textvariable=self.colormap_var,
+            values=["inferno", "jet", "hot", "turbo", "magma", "rainbow",
+                    "bone", "white_hot", "black_hot"],
+            state="readonly", width=12,
+        ).grid(row=0, column=3, sticky="w", padx=4)
 
         # --- Status ---
         self.status_var = tk.StringVar(value="Ready")
         ttk.Label(self.root, textvariable=self.status_var, anchor="w").grid(
-            row=4, column=0, sticky="ew", padx=8, pady=4,
+            row=5, column=0, sticky="ew", padx=8, pady=4,
         )
 
     def _refresh_devices(self):
@@ -274,6 +310,58 @@ class RecorderApp:
         time_str = f"{hrs:02d}:{mins:02d}:{secs:02d}"
         self.status_var.set(f"● REC #{self.clip_count}  {time_str}")
         self.root.after(500, self._update_timer)
+
+    def _open_preview(self):
+        """Launch a live preview window for the selected regular camera."""
+        cam = self._get_camera_index()
+        if cam is None:
+            self.status_var.set("No camera selected!")
+            return
+
+        res = self.res_var.get()
+        w, h = 1920, 1080
+        if "x" in res:
+            w, h = (int(x) for x in res.split("x"))
+        fps = int(float(self.fps_var.get() or "30"))
+
+        self.status_var.set("Opening preview...")
+        self.root.update_idletasks()
+
+        def _run():
+            from preview import PreviewWindow
+            pw = PreviewWindow(
+                mode="regular",
+                device_index=cam,
+                width=w,
+                height=h,
+                fps=fps,
+            )
+            pw.run()
+            # Update status back on main thread
+            self.root.after(0, lambda: self.status_var.set("Preview closed"))
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _open_thermal(self):
+        """Launch a thermal camera preview window."""
+        cam = self._get_camera_index()
+        mode = self.thermal_mode_var.get()
+        colormap = self.colormap_var.get()
+
+        self.status_var.set(f"Opening thermal preview ({mode})...")
+        self.root.update_idletasks()
+
+        def _run():
+            from preview import PreviewWindow
+            pw = PreviewWindow(
+                mode=mode,
+                device_index=cam if cam is not None else 0,
+                colormap=colormap,
+            )
+            pw.run()
+            self.root.after(0, lambda: self.status_var.set("Thermal preview closed"))
+
+        threading.Thread(target=_run, daemon=True).start()
 
 
 def main():

@@ -1,2 +1,5 @@
 opencv-python>=4.8.0
 numpy>=1.24.0
+
+# Optional: Waveshare/Meridian MI48 thermal cameras
+# pip install senxor
