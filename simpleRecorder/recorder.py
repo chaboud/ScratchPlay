@@ -7,7 +7,9 @@ Supports:
 - Configurable resolution, frame rate, and quality (CRF)
 """
 
+import atexit
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -124,8 +126,10 @@ class RecordingSession:
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            start_new_session=True,
         )
         self._start_time = time.time()
+        atexit.register(self._atexit_cleanup)
         return self._output_path
 
     def stop(self):
@@ -147,8 +151,7 @@ class RecordingSession:
             try:
                 self._process.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                self._process.kill()
-                self._process.wait()
+                self._kill_process()
 
         duration = time.time() - self._start_time if self._start_time else 0
         path = self._output_path
@@ -158,6 +161,36 @@ class RecordingSession:
         self._start_time = None
 
         return path, duration
+
+    def _kill_process(self):
+        """Kill the ffmpeg process and its process group."""
+        if self._process is None:
+            return
+        try:
+            os.killpg(os.getpgid(self._process.pid), signal.SIGKILL)
+        except (ProcessLookupError, OSError):
+            pass
+        try:
+            self._process.kill()
+        except OSError:
+            pass
+        try:
+            self._process.wait(timeout=2)
+        except Exception:
+            pass
+
+    def _atexit_cleanup(self):
+        """Safety net: kill ffmpeg on interpreter exit."""
+        if self._process is not None and self._process.poll() is None:
+            self._kill_process()
+            self._process = None
+
+    def __del__(self):
+        """Last-resort cleanup."""
+        try:
+            self._atexit_cleanup()
+        except Exception:
+            pass
 
     def is_recording(self):
         """Check if recording is currently active."""

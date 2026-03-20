@@ -35,16 +35,23 @@ from recorder import RecordingSession, CODEC_MAP
 
 
 def _run_preview_process(cam, w, h, fps, codec, container, crf, output_dir,
-                         base_name, preroll, audio_device, overlay):
+                         base_name, preroll, audio_device,
+                         preview_tc, preview_meters, record_tc, record_meters):
     """Run preview in a separate process so OpenCV gets its own main thread."""
-    from preview import PreviewWindow
-    pw = PreviewWindow(
-        mode="regular", device_index=cam, width=w, height=h, fps=fps,
+    from pipeline import RecordingPipeline
+    pipe = RecordingPipeline(
+        device_index=cam, width=w, height=h, fps=fps,
         codec=codec, container=container, crf=crf,
         output_dir=output_dir, base_name=base_name,
-        pre_roll_seconds=preroll, audio_device=audio_device, overlay=overlay,
+        pre_roll_seconds=preroll, audio_device=audio_device,
+        preview_timecode=preview_tc, preview_meters=preview_meters,
+        record_timecode=record_tc, record_meters=record_meters,
     )
-    pw.run()
+    pipe.open()
+    try:
+        pipe.show_preview()
+    finally:
+        pipe.close()
 
 
 def _run_thermal_process(mode, device_index, colormap, output_dir, base_name,
@@ -200,12 +207,37 @@ class RecorderApp(QMainWindow):
         name_row.addWidget(QLabel("Base name:"))
         self.name_edit = QLineEdit("recording")
         name_row.addWidget(self.name_edit, 1)
-        self.overlay_check = QCheckBox("Burn timecode")
-        self.overlay_check.setChecked(True)
-        name_row.addWidget(self.overlay_check)
         out_layout.addLayout(name_row)
 
         main_layout.addWidget(out_group)
+
+        # --- Overlays ---
+        overlay_group = QGroupBox("Overlays")
+        overlay_layout = QVBoxLayout(overlay_group)
+
+        preview_row = QHBoxLayout()
+        preview_row.addWidget(QLabel("Preview:"))
+        self.preview_tc_check = QCheckBox("Timecode")
+        self.preview_tc_check.setChecked(True)
+        preview_row.addWidget(self.preview_tc_check)
+        self.preview_meters_check = QCheckBox("Meters")
+        self.preview_meters_check.setChecked(True)
+        preview_row.addWidget(self.preview_meters_check)
+        preview_row.addStretch()
+        overlay_layout.addLayout(preview_row)
+
+        record_row = QHBoxLayout()
+        record_row.addWidget(QLabel("Recording:"))
+        self.record_tc_check = QCheckBox("Timecode")
+        self.record_tc_check.setChecked(False)
+        record_row.addWidget(self.record_tc_check)
+        self.record_meters_check = QCheckBox("Meters")
+        self.record_meters_check.setChecked(False)
+        record_row.addWidget(self.record_meters_check)
+        record_row.addStretch()
+        overlay_layout.addLayout(record_row)
+
+        main_layout.addWidget(overlay_group)
 
         # --- Main Buttons ---
         btn_layout = QHBoxLayout()
@@ -493,7 +525,11 @@ class RecorderApp(QMainWindow):
             args=(cam, w, h, fps, self.codec_combo.currentText(),
                   self.container_combo.currentText(), crf, self.dir_edit.text(),
                   self.name_edit.text(), preroll,
-                  self._get_audio_index(), self.overlay_check.isChecked()),
+                  self._get_audio_index(),
+                  self.preview_tc_check.isChecked(),
+                  self.preview_meters_check.isChecked(),
+                  self.record_tc_check.isChecked(),
+                  self.record_meters_check.isChecked()),
             daemon=True,
         )
         p.start()

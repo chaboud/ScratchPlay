@@ -7,6 +7,7 @@ The pre-roll buffer keeps the last N seconds of frames in memory so that
 when recording starts, you get footage from before the button was pressed.
 """
 
+import atexit
 import collections
 import threading
 import time
@@ -118,6 +119,7 @@ class FrameGrabber:
         self._start_time = time.time()
         self._thread = threading.Thread(target=self._grab_loop, daemon=True)
         self._thread.start()
+        atexit.register(self._atexit_cleanup)
 
         print(f"FrameGrabber: {self.width}x{self.height}@{self.fps:.0f} on device {self.device_index}")
 
@@ -168,6 +170,18 @@ class FrameGrabber:
         if self._cap is not None:
             self._cap.release()
             self._cap = None
+
+    def _atexit_cleanup(self):
+        """Safety net: release camera on interpreter exit."""
+        if self._cap is not None and self._cap.isOpened():
+            self.close()
+
+    def __del__(self):
+        """Last-resort cleanup."""
+        try:
+            self._atexit_cleanup()
+        except Exception:
+            pass
 
     def __enter__(self):
         self.open()

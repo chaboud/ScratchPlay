@@ -38,16 +38,24 @@ from recorder import RecordingSession, CODEC_MAP
 # ---------------------------------------------------------------------------
 
 def _run_preview_process(cam, w, h, fps, codec, container, crf, output_dir,
-                         base_name, preroll, audio_device, overlay):
+                         base_name, preroll, audio_device,
+                         preview_tc, preview_meters,
+                         record_tc, record_meters):
     """Run preview in a separate process so OpenCV gets its own main thread."""
-    from preview import PreviewWindow
-    pw = PreviewWindow(
-        mode="regular", device_index=cam, width=w, height=h, fps=fps,
+    from pipeline import RecordingPipeline
+    pipe = RecordingPipeline(
+        device_index=cam, width=w, height=h, fps=fps,
         codec=codec, container=container, crf=crf,
         output_dir=output_dir, base_name=base_name,
-        pre_roll_seconds=preroll, audio_device=audio_device, overlay=overlay,
+        pre_roll_seconds=preroll, audio_device=audio_device,
+        preview_timecode=preview_tc, preview_meters=preview_meters,
+        record_timecode=record_tc, record_meters=record_meters,
     )
-    pw.run()
+    pipe.open()
+    try:
+        pipe.show_preview()
+    finally:
+        pipe.close()
 
 
 def _run_thermal_process(mode, device_index, colormap, output_dir, base_name,
@@ -327,9 +335,25 @@ class RecorderTUI(App):
                         classes="field-widget",
                     )
 
+            # --- Overlays ---
+            with Container(classes="section"):
+                yield Label("Overlays", classes="section-title")
+
                 with Horizontal(classes="switch-row"):
-                    yield Switch(value=True, id="overlay-switch")
-                    yield Label("Burn timecode", classes="switch-label")
+                    yield Switch(value=True, id="preview-tc-switch")
+                    yield Label("Preview Timecode", classes="switch-label")
+
+                with Horizontal(classes="switch-row"):
+                    yield Switch(value=True, id="preview-meters-switch")
+                    yield Label("Preview Meters", classes="switch-label")
+
+                with Horizontal(classes="switch-row"):
+                    yield Switch(value=False, id="record-tc-switch")
+                    yield Label("Recording Timecode", classes="switch-label")
+
+                with Horizontal(classes="switch-row"):
+                    yield Switch(value=False, id="record-meters-switch")
+                    yield Label("Recording Meters", classes="switch-label")
 
             # --- Action Buttons ---
             with Horizontal(id="btn-row"):
@@ -643,7 +667,11 @@ class RecorderTUI(App):
         container_sel = self.query_one("#container-select", Select)
         dir_input = self.query_one("#dir-input", Input)
         name_input = self.query_one("#name-input", Input)
-        overlay_switch = self.query_one("#overlay-switch", Switch)
+
+        preview_tc = self.query_one("#preview-tc-switch", Switch).value
+        preview_meters = self.query_one("#preview-meters-switch", Switch).value
+        record_tc = self.query_one("#record-tc-switch", Switch).value
+        record_meters = self.query_one("#record-meters-switch", Switch).value
 
         self._set_status("Opening preview...")
 
@@ -653,7 +681,9 @@ class RecorderTUI(App):
                 cam, w, h, fps, str(codec_sel.value),
                 str(container_sel.value), crf, dir_input.value,
                 name_input.value, preroll,
-                self._get_audio_index(), overlay_switch.value,
+                self._get_audio_index(),
+                preview_tc, preview_meters,
+                record_tc, record_meters,
             ),
             daemon=True,
         )

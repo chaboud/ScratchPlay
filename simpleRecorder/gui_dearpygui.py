@@ -32,16 +32,23 @@ from recorder import RecordingSession, CODEC_MAP
 # ---------------------------------------------------------------------------
 
 def _run_preview_process(cam, w, h, fps, codec, container, crf, output_dir,
-                         base_name, preroll, audio_device, overlay):
+                         base_name, preroll, audio_device,
+                         preview_tc, preview_meters, record_tc, record_meters):
     """Run preview in a separate process so OpenCV gets its own main thread."""
-    from preview import PreviewWindow
-    pw = PreviewWindow(
-        mode="regular", device_index=cam, width=w, height=h, fps=fps,
+    from pipeline import RecordingPipeline
+    pipe = RecordingPipeline(
+        device_index=cam, width=w, height=h, fps=fps,
         codec=codec, container=container, crf=crf,
         output_dir=output_dir, base_name=base_name,
-        pre_roll_seconds=preroll, audio_device=audio_device, overlay=overlay,
+        pre_roll_seconds=preroll, audio_device=audio_device,
+        preview_timecode=preview_tc, preview_meters=preview_meters,
+        record_timecode=record_tc, record_meters=record_meters,
     )
-    pw.run()
+    pipe.open()
+    try:
+        pipe.show_preview()
+    finally:
+        pipe.close()
 
 
 def _run_thermal_process(mode, device_index, colormap, output_dir, base_name,
@@ -125,7 +132,10 @@ class RecorderApp:
         self.preroll_input = None
         self.dir_input = None
         self.name_input = None
-        self.overlay_check = None
+        self.preview_tc_check = None
+        self.preview_meters_check = None
+        self.record_tc_check = None
+        self.record_meters_check = None
         self.record_btn = None
         self.thermal_mode_combo = None
         self.colormap_combo = None
@@ -207,8 +217,26 @@ class RecorderApp:
                     self.name_input = dpg.add_input_text(
                         default_value="recording", width=200,
                     )
-                    self.overlay_check = dpg.add_checkbox(
-                        label="Burn timecode", default_value=True,
+
+            dpg.add_spacer(height=4)
+
+            # --- Overlays ---
+            with dpg.collapsing_header(label="Overlays", default_open=True):
+                with dpg.group(horizontal=True):
+                    dpg.add_text("Preview:")
+                    self.preview_tc_check = dpg.add_checkbox(
+                        label="Timecode", default_value=True,
+                    )
+                    self.preview_meters_check = dpg.add_checkbox(
+                        label="Meters", default_value=True,
+                    )
+                with dpg.group(horizontal=True):
+                    dpg.add_text("Recording:")
+                    self.record_tc_check = dpg.add_checkbox(
+                        label="Timecode", default_value=False,
+                    )
+                    self.record_meters_check = dpg.add_checkbox(
+                        label="Meters", default_value=False,
                     )
 
             # Folder dialog (hidden until Browse is clicked)
@@ -465,7 +493,10 @@ class RecorderApp:
 
         preroll = dpg.get_value(self.preroll_input)
         crf = dpg.get_value(self.crf_input)
-        overlay = dpg.get_value(self.overlay_check)
+        preview_tc = dpg.get_value(self.preview_tc_check)
+        preview_meters = dpg.get_value(self.preview_meters_check)
+        record_tc = dpg.get_value(self.record_tc_check)
+        record_meters = dpg.get_value(self.record_meters_check)
 
         self._set_status("Opening preview...")
 
@@ -475,7 +506,8 @@ class RecorderApp:
                   dpg.get_value(self.container_combo), crf,
                   dpg.get_value(self.dir_input),
                   dpg.get_value(self.name_input), preroll,
-                  self._get_audio_index(), overlay),
+                  self._get_audio_index(),
+                  preview_tc, preview_meters, record_tc, record_meters),
             daemon=True,
         )
         p.start()
