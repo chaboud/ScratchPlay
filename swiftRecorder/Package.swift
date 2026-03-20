@@ -4,6 +4,7 @@ import PackageDescription
 let package = Package(
     name: "SwiftRecorder",
     platforms: [.macOS(.v15)],
+    swiftLanguageModes: [.v5],
     products: [
         .executable(name: "swiftrecorder", targets: ["SwiftRecorderApp"]),
         .executable(name: "swiftrecorder-cli", targets: ["SwiftRecorderCLI"]),
