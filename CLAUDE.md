@@ -75,7 +75,7 @@ python gui_textual.py                           # Textual TUI (pip install textu
 - **Location**: `swiftRecorder/`
 - **Language**: Swift 5.9+, SwiftUI, AVFoundation, VideoToolbox
 - **Build**: `swift build` (SPM), no Xcode project needed
-- **Platform**: macOS 13+ (Ventura)
+- **Platform**: macOS 15+ (Sequoia)
 
 ### Architecture
 - `Sources/SwiftRecorder/Camera/` — DeviceEnumerator, CaptureSession, AudioLevelMonitor
