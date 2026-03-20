@@ -8,9 +8,17 @@ Audio level meter, pre-roll buffer, timecode overlay, thermal range lock.
 
 import multiprocessing
 import os
+import sys
 import time
-import tkinter as tk
-from tkinter import filedialog, ttk
+
+try:
+    import tkinter as tk
+    from tkinter import filedialog, ttk
+except (ImportError, ModuleNotFoundError):
+    print("Error: tkinter is not available in this Python installation.")
+    print("  On macOS with Homebrew: brew install python-tk@3.14")
+    print("  Or use the CLI instead: python cli.py --help")
+    sys.exit(1)
 
 from devices import list_avfoundation_devices, probe_camera_formats, get_unique_resolutions, get_fps_for_resolution
 from recorder import RecordingSession, CODEC_MAP

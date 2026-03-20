@@ -51,6 +51,12 @@ def parse_args():
     _add_recording_args(int_p)
     int_p.add_argument("--max-length", type=float, default=None,
                        help="Max clip length in seconds")
+    int_p.add_argument("--preview", action="store_true",
+                       help="Open live preview window (use R key to record)")
+    int_p.add_argument("--pre-roll", type=float, default=5.0,
+                       help="Pre-roll buffer seconds (default 5, with --preview)")
+    int_p.add_argument("--no-overlay", action="store_true",
+                       help="Disable timecode overlay (with --preview)")
 
     # --- preview (unified pipeline: preview + record) ---
     prev_p = sub.add_parser("preview", help="Live preview window with recording")
@@ -107,10 +113,29 @@ def _add_recording_args(parser):
                         help="Quality (lower=better, default 20)")
     parser.add_argument("--output-dir", "-o", default=".")
     parser.add_argument("--base-name", "-n", default="recording")
+    parser.add_argument("--target", "-T", default=None,
+                        help="Target output path (e.g. /tmp/myvideo.mov). "
+                             "Overrides --output-dir, --base-name, --container")
+
+
+def _resolve_target(args):
+    """If --target is set, derive output-dir, base-name, and container from it."""
+    if not hasattr(args, 'target') or args.target is None:
+        return
+    target = args.target
+    args.output_dir = os.path.dirname(target) or "."
+    base = os.path.basename(target)
+    stem, ext = os.path.splitext(base)
+    args.base_name = stem
+    if ext.lower() in (".mp4",):
+        args.container = "mp4"
+    elif ext.lower() in (".mov",):
+        args.container = "mov"
 
 
 def _resolve_defaults(args):
     """Fill in width/height/fps from camera probe if not explicitly set."""
+    _resolve_target(args)
     if args.width is None or args.height is None or args.fps is None:
         print(f"Probing camera {args.camera} for best defaults...")
         w, h, fps = get_best_defaults(args.camera)
@@ -155,6 +180,11 @@ def _getch_nonblocking(timeout=0.1):
 
 def cmd_interactive(args):
     _resolve_defaults(args)
+
+    if args.preview:
+        _interactive_preview(args)
+        return
+
     session = RecordingSession(
         video_device=args.camera,
         audio_device=args.audio,
@@ -217,6 +247,31 @@ def cmd_interactive(args):
             path, dur = session.stop()
             print(f"\n■ STOP: {os.path.basename(path)} ({dur:.1f}s)")
         print(f"\nInterrupted. {clip_count} clip(s) recorded.")
+
+
+def _interactive_preview(args):
+    """Interactive mode with live preview window via RecordingPipeline."""
+    from pipeline import RecordingPipeline
+
+    pipe = RecordingPipeline(
+        device_index=args.camera,
+        width=args.width,
+        height=args.height,
+        fps=args.fps,
+        codec=args.codec,
+        container=args.container,
+        crf=args.crf if args.crf else 20,
+        output_dir=args.output_dir,
+        base_name=args.base_name,
+        pre_roll_seconds=args.pre_roll,
+        overlay=not args.no_overlay,
+        audio_device=args.audio,
+    )
+    pipe.open()
+    try:
+        pipe.show_preview()
+    finally:
+        pipe.close()
 
 
 def cmd_preview(args):
