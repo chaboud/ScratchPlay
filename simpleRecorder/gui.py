@@ -167,9 +167,9 @@ class RecorderApp:
         ttk.Checkbutton(ovl_frame, text="Meters", variable=self.preview_meters_var).grid(row=0, column=2, padx=4)
 
         ttk.Label(ovl_frame, text="Recording:").grid(row=1, column=0, sticky="w")
-        self.record_tc_var = tk.BooleanVar(value=False)
+        self.record_tc_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(ovl_frame, text="Timecode", variable=self.record_tc_var).grid(row=1, column=1, padx=4)
-        self.record_meters_var = tk.BooleanVar(value=False)
+        self.record_meters_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(ovl_frame, text="Meters", variable=self.record_meters_var).grid(row=1, column=2, padx=4)
 
         # --- Main Buttons ---

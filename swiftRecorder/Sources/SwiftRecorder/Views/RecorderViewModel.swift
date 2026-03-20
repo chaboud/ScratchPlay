@@ -33,8 +33,13 @@ public final class RecorderViewModel: ObservableObject {
     @Published var selectedQuality: VideoQuality = .high
     @Published var customBitrateMbps: String = ""
 
-    @Published var outputPath: String = FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first!.path
-    @Published var baseName: String = "recording"
+    /// Full save path template: directory + base name (no extension).
+    /// Example: "/Users/me/Movies/recording"
+    /// Browse sets the directory portion; user can edit the filename part.
+    @Published var savePath: String = {
+        let movies = FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first!
+        return movies.appendingPathComponent("recording").path
+    }()
 
     enum VideoQuality: String, CaseIterable, Identifiable {
         case low = "Low"
@@ -82,7 +87,12 @@ public final class RecorderViewModel: ObservableObject {
     }
 
     var outputDirectory: URL {
-        URL(fileURLWithPath: outputPath)
+        let url = URL(fileURLWithPath: savePath)
+        return url.deletingLastPathComponent()
+    }
+
+    var baseName: String {
+        URL(fileURLWithPath: savePath).lastPathComponent
     }
 
     // MARK: - Objects

@@ -145,13 +145,13 @@ public struct RecorderView: View {
                     Spacer()
                 }
 
-                // Output settings
+                // Output settings — single path field: /dir/basename
                 HStack {
                     VStack(alignment: .leading) {
-                        Text("Output Folder").font(.caption).foregroundColor(.secondary)
+                        Text("Save to (folder / base name)").font(.caption).foregroundColor(.secondary)
                         HStack {
-                            TextField("Path", text: $viewModel.outputPath)
-                                .frame(width: 300)
+                            TextField("/path/to/basename", text: $viewModel.savePath)
+                                .frame(minWidth: 350)
                                 .textFieldStyle(.roundedBorder)
 
                             Button("Browse...") {
@@ -161,17 +161,12 @@ public struct RecorderView: View {
                                 panel.allowsMultipleSelection = false
                                 panel.directoryURL = viewModel.outputDirectory
                                 if panel.runModal() == .OK, let url = panel.url {
-                                    viewModel.outputPath = url.path
+                                    // Keep existing base name, update directory
+                                    let base = viewModel.baseName
+                                    viewModel.savePath = url.appendingPathComponent(base).path
                                 }
                             }
                         }
-                    }
-
-                    VStack(alignment: .leading) {
-                        Text("Base Name").font(.caption).foregroundColor(.secondary)
-                        TextField("recording", text: $viewModel.baseName)
-                            .frame(width: 150)
-                            .textFieldStyle(.roundedBorder)
                     }
 
                     Spacer()
