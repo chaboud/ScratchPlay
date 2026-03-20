@@ -175,33 +175,28 @@ private struct ControlsSection: View {
                 Spacer()
             }
 
-            // Output settings — separate folder + base name fields
-            HStack(alignment: .top, spacing: 16) {
+            // Output settings — single editable path/basename field
+            HStack {
                 VStack(alignment: .leading) {
-                    Text("Folder").font(.caption).foregroundColor(.secondary)
+                    Text("Save to (folder / base name)").font(.caption).foregroundColor(.secondary)
                     HStack {
-                        TextField("/path/to/folder", text: $viewModel.saveDirectory)
-                            .frame(minWidth: 300)
+                        TextField("/path/to/basename", text: $viewModel.savePath)
+                            .frame(minWidth: 350)
                             .textFieldStyle(.roundedBorder)
 
                         Button("Browse...") {
-                            let panel = NSOpenPanel()
+                            let panel = NSSavePanel()
                             panel.directoryURL = viewModel.outputDirectory
-                            panel.canChooseDirectories = true
-                            panel.canChooseFiles = false
+                            panel.nameFieldStringValue = viewModel.baseName
+                            panel.allowedContentTypes = [.movie]
                             panel.canCreateDirectories = true
                             if panel.runModal() == .OK, let url = panel.url {
-                                viewModel.saveDirectory = url.path
+                                let dir = url.deletingLastPathComponent().path
+                                let stem = url.deletingPathExtension().lastPathComponent
+                                viewModel.savePath = dir + "/" + stem
                             }
                         }
                     }
-                }
-
-                VStack(alignment: .leading) {
-                    Text("Base name").font(.caption).foregroundColor(.secondary)
-                    TextField("recording", text: $viewModel.saveBaseName)
-                        .frame(width: 180)
-                        .textFieldStyle(.roundedBorder)
                 }
 
                 Spacer()
