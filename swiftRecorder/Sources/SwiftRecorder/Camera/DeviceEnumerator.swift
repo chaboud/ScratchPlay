@@ -48,11 +48,14 @@ public final class DeviceEnumerator {
 
     /// All video capture devices.
     public static func videoDevices() -> [DeviceInfo] {
+        var deviceTypes: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera]
+        if #available(macOS 14.0, *) {
+            deviceTypes.append(.external)
+        } else {
+            deviceTypes.append(.externalUnknown)
+        }
         let discovery = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [
-                .builtInWideAngleCamera,
-                .external,
-            ],
+            deviceTypes: deviceTypes,
             mediaType: .video,
             position: .unspecified
         )
@@ -69,8 +72,14 @@ public final class DeviceEnumerator {
 
     /// All audio capture devices.
     public static func audioDevices() -> [DeviceInfo] {
+        var deviceTypes: [AVCaptureDevice.DeviceType] = [.builtInMicrophone]
+        if #available(macOS 14.0, *) {
+            deviceTypes.append(.external)
+        } else {
+            deviceTypes.append(.externalUnknown)
+        }
         let discovery = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.builtInMicrophone, .external],
+            deviceTypes: deviceTypes,
             mediaType: .audio,
             position: .unspecified
         )
