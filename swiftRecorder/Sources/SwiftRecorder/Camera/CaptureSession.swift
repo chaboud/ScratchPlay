@@ -51,7 +51,8 @@ public final class CaptureSession: NSObject, ObservableObject {
         audioDevice: AVCaptureDevice? = nil,
         width: Int? = nil,
         height: Int? = nil,
-        fps: Double? = nil
+        fps: Double? = nil,
+        mediaSubType: CMFormatDescription.MediaSubType? = nil
     ) throws {
         session.beginConfiguration()
         defer { session.commitConfiguration() }
@@ -77,7 +78,8 @@ public final class CaptureSession: NSObject, ObservableObject {
         if targetW > 0 && targetH > 0 {
             if let (format, fpsRange) = DeviceEnumerator.bestFormat(
                 for: videoDevice, width: targetW, height: targetH,
-                fps: targetFPS > 0 ? targetFPS : DeviceEnumerator.maxFrameRate(for: videoDevice, width: targetW, height: targetH)
+                fps: targetFPS > 0 ? targetFPS : DeviceEnumerator.maxFrameRate(for: videoDevice, width: targetW, height: targetH, mediaSubType: mediaSubType),
+                mediaSubType: mediaSubType
             ) {
                 try videoDevice.lockForConfiguration()
                 videoDevice.activeFormat = format

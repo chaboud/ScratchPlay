@@ -18,10 +18,17 @@ public final class RecorderViewModel: ObservableObject {
     }
 
     @Published var availableResolutions: [String] = []
+    @Published var availableModes: [String] = []
     @Published var availableFPS: [String] = []
+
+    /// Maps mode label -> CMFormatDescription.MediaSubType for the current resolution.
+    var modeSubTypes: [String: CMFormatDescription.MediaSubType] = [:]
 
     @Published var selectedResolution: String = "" {
         didSet { onResolutionChanged() }
+    }
+    @Published var selectedMode: String = "" {
+        didSet { onModeChanged() }
     }
     @Published var selectedFPS: String = "" {
         didSet { reconfigureSession() }
@@ -165,9 +172,30 @@ public final class RecorderViewModel: ObservableObject {
         guard parts.count == 2,
               let w = Int(parts[0]), let h = Int(parts[1]) else { return }
 
-        // Get available FPS for this resolution
+        // Populate available camera modes for this resolution
+        let modes = DeviceEnumerator.uniqueModes(for: device, width: w, height: h)
+        modeSubTypes = Dictionary(uniqueKeysWithValues: modes.map { ($0.label, $0.subType) })
+        availableModes = modes.map(\.label)
+
+        if let first = availableModes.first {
+            selectedMode = first
+        } else {
+            onModeChanged()
+        }
+    }
+
+    private func onModeChanged() {
+        guard let device = selectedVideoDevice else { return }
+        let parts = selectedResolution.split(separator: "x")
+        guard parts.count == 2,
+              let w = Int(parts[0]), let h = Int(parts[1]) else { return }
+
+        let subType = modeSubTypes[selectedMode]
+
+        // Get available FPS for this resolution + mode
         let formats = DeviceEnumerator.formats(for: device)
-            .filter { $0.width == w && $0.height == h }
+            .filter { $0.width == w && $0.height == h
+                && (subType == nil || $0.mediaSubType == subType) }
         let allFPS = Set(formats.flatMap { $0.frameRates }).sorted()
 
         availableFPS = allFPS.map { String(format: "%.0f", $0) }
@@ -185,6 +213,7 @@ public final class RecorderViewModel: ObservableObject {
         let w = parts.count == 2 ? Int(parts[0]) : nil
         let h = parts.count == 2 ? Int(parts[1]) : nil
         let fps = Double(selectedFPS)
+        let subType = modeSubTypes[selectedMode]
 
         do {
             try captureSession.configure(
@@ -192,7 +221,8 @@ public final class RecorderViewModel: ObservableObject {
                 audioDevice: selectedAudioDevice,
                 width: w,
                 height: h,
-                fps: fps
+                fps: fps,
+                mediaSubType: subType
             )
             if !captureSession.isRunning {
                 captureSession.start()

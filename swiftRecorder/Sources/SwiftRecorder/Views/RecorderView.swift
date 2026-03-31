@@ -113,6 +113,17 @@ private struct ControlsSection: View {
                 }
 
                 VStack(alignment: .leading) {
+                    Text("Mode").font(.caption).foregroundColor(.secondary)
+                    Picker("Mode", selection: $viewModel.selectedMode) {
+                        ForEach(viewModel.availableModes, id: \.self) { mode in
+                            Text(mode).tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 90)
+                }
+
+                VStack(alignment: .leading) {
                     Text("FPS").font(.caption).foregroundColor(.secondary)
                     Picker("FPS", selection: $viewModel.selectedFPS) {
                         ForEach(viewModel.availableFPS, id: \.self) { fps in
@@ -246,7 +257,8 @@ private struct RecordButtonSection: View {
             Spacer()
 
             VStack(alignment: .trailing) {
-                Text("\(captureSession.activeWidth)x\(captureSession.activeHeight)@\(String(format: "%.0f", captureSession.activeFPS))fps")
+                let modeStr = viewModel.selectedMode.isEmpty ? "" : " [\(viewModel.selectedMode)]"
+                Text("\(captureSession.activeWidth)x\(captureSession.activeHeight)@\(String(format: "%.0f", captureSession.activeFPS))fps\(modeStr)")
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(.secondary)
                 if recordingEngine.isRecording {

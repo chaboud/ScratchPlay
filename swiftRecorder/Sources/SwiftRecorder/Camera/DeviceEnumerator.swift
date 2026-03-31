@@ -14,10 +14,33 @@ public final class DeviceEnumerator {
 
         public var description: String {
             let fpsStr = frameRates.map { String(format: "%.0f", $0) }.joined(separator: "/")
-            return "\(width)x\(height)@\(fpsStr)fps"
+            return "\(width)x\(height)@\(fpsStr)fps [\(Self.label(for: mediaSubType))]"
         }
 
         public var pixelCount: Int { width * height }
+
+        /// Human-readable label for a media subtype FourCC.
+        public static func label(for subType: CMFormatDescription.MediaSubType) -> String {
+            switch subType {
+            case .init(rawValue: kCMVideoCodecType_JPEG),
+                 .init(rawValue: kCMVideoCodecType_JPEG_OpenDML):
+                return "MJPEG"
+            case .init(rawValue: kCMVideoCodecType_H264):
+                return "H.264"
+            case .init(rawValue: kCMVideoCodecType_HEVC):
+                return "HEVC"
+            default:
+                // Decode FourCC to readable string (e.g. "420v", "yuvs", "2vuy")
+                let raw = subType.rawValue
+                let c1 = Character(UnicodeScalar((raw >> 24) & 0xFF)!)
+                let c2 = Character(UnicodeScalar((raw >> 16) & 0xFF)!)
+                let c3 = Character(UnicodeScalar((raw >> 8) & 0xFF)!)
+                let c4 = Character(UnicodeScalar(raw & 0xFF)!)
+                let fourCC = String([c1, c2, c3, c4])
+                    .trimmingCharacters(in: .whitespaces)
+                return fourCC.isEmpty ? "raw" : fourCC
+            }
+        }
     }
 
     /// Info about a discovered device.
@@ -135,21 +158,45 @@ public final class DeviceEnumerator {
         return result
     }
 
-    /// Max frame rate available for a given resolution.
-    public static func maxFrameRate(for device: AVCaptureDevice, width: Int, height: Int) -> Double {
-        let matching = formats(for: device).filter { $0.width == width && $0.height == height }
+    /// Unique camera modes (media subtypes) for a given resolution, e.g. ["MJPEG", "420v"].
+    public static func uniqueModes(for device: AVCaptureDevice, width: Int, height: Int) -> [(label: String, subType: CMFormatDescription.MediaSubType)] {
+        var seen = Set<FourCharCode>()
+        var result: [(String, CMFormatDescription.MediaSubType)] = []
+        for fmt in formats(for: device).filter({ $0.width == width && $0.height == height }) {
+            let raw = fmt.mediaSubType.rawValue
+            if seen.insert(raw).inserted {
+                result.append((CameraFormat.label(for: fmt.mediaSubType), fmt.mediaSubType))
+            }
+        }
+        return result
+    }
+
+    /// Max frame rate available for a given resolution and optional media subtype.
+    public static func maxFrameRate(for device: AVCaptureDevice, width: Int, height: Int,
+                                     mediaSubType: CMFormatDescription.MediaSubType? = nil) -> Double {
+        let matching = formats(for: device).filter {
+            $0.width == width && $0.height == height
+            && (mediaSubType == nil || $0.mediaSubType == mediaSubType)
+        }
         return matching.compactMap { $0.frameRates.last }.max() ?? 30
     }
 
-    /// Find the best format matching target resolution and frame rate.
+    /// Find the best format matching target resolution, frame rate, and optional media subtype.
     /// Returns the AVCaptureDevice.Format and the exact frame rate range to use.
     public static func bestFormat(
         for device: AVCaptureDevice,
-        width: Int, height: Int, fps: Double
+        width: Int, height: Int, fps: Double,
+        mediaSubType: CMFormatDescription.MediaSubType? = nil
     ) -> (AVCaptureDevice.Format, AVFrameRateRange)? {
         for format in device.formats {
-            let dims = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+            let desc = format.formatDescription
+            let dims = CMVideoFormatDescriptionGetDimensions(desc)
             guard Int(dims.width) == width, Int(dims.height) == height else { continue }
+
+            if let wanted = mediaSubType {
+                let actual = CMFormatDescription.MediaSubType(rawValue: CMFormatDescriptionGetMediaSubType(desc))
+                guard actual == wanted else { continue }
+            }
 
             for range in format.videoSupportedFrameRateRanges {
                 if range.minFrameRate <= fps && fps <= range.maxFrameRate {
@@ -193,10 +240,13 @@ public final class DeviceEnumerator {
         print("=== Formats for \(device.localizedName) ===")
         let resolutions = uniqueResolutions(for: device)
         for (w, h) in resolutions {
-            let matching = fmts.filter { $0.width == w && $0.height == h }
-            let allFPS = Set(matching.flatMap { $0.frameRates }).sorted()
-            let fpsStr = allFPS.map { String(format: "%.0f", $0) }.joined(separator: ", ")
-            print("  \(w)x\(h) @ \(fpsStr) fps")
+            let modes = uniqueModes(for: device, width: w, height: h)
+            for (label, subType) in modes {
+                let matching = fmts.filter { $0.width == w && $0.height == h && $0.mediaSubType == subType }
+                let allFPS = Set(matching.flatMap { $0.frameRates }).sorted()
+                let fpsStr = allFPS.map { String(format: "%.0f", $0) }.joined(separator: ", ")
+                print("  \(w)x\(h) [\(label)] @ \(fpsStr) fps")
+            }
         }
     }
 }
